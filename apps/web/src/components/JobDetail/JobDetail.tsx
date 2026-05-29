@@ -22,7 +22,7 @@ export function JobDetail({
   const canExport = Boolean(job && canExportJobTokens(job));
   return (
     <Card
-      title={job ? `任务详情 #${job.id}` : "任务详情"}
+      title={job ? `Job Details #${job.id}` : "Job Details"}
       className="min-h-0"
       actions={
         job ? (
@@ -31,33 +31,33 @@ export function JobDetail({
             onClick={() => exportJobTokens(job)}
             disabled={busy || !canExport}
             title={
-              canExport
-                ? "导出成功邮箱的 token"
-                : "只有已完成或已结束任务可以导出 token"
-            }
+                canExport
+                  ? "Export tokens from successful mailboxes"
+                  : "Only finished or stopped jobs can export tokens"
+              }
             className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
           >
-            导出 Token
+            Export Tokens
           </button>
         ) : null
       }
     >
       {!job && (
         <EmptyState
-          title="暂无任务详情"
-          description="从左侧任务列表选择任务后，可查看邮箱明细。"
+          title="No job selected"
+          description="Select a job from the list to inspect mailbox details."
         />
       )}
       {job && (
         <div className="flex h-[360px] flex-col lg:h-full lg:min-h-0">
           <div className="mb-3 grid grid-cols-3 gap-2">
-            <MiniStat label="总数" value={job.total_count} />
-            <MiniStat label="成功" value={job.success_count} />
-            <MiniStat label="失败" value={job.failed_count} />
+            <MiniStat label="Total" value={job.total_count} />
+            <MiniStat label="Success" value={job.success_count} />
+            <MiniStat label="Failed" value={job.failed_count} />
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {(job.items || []).length === 0 && (
-              <EmptyState title="暂无邮箱明细" description="本任务还没有邮箱执行记录。" />
+              <EmptyState title="No mailbox items yet" description="This job has no mailbox execution records yet." />
             )}
             {(job.items || []).map((item) => {
               const mailbox = mailboxes.find(
@@ -82,14 +82,14 @@ export function JobDetail({
                       {item.email}
                     </div>
                     <div className="mt-1 text-sm text-slate-500">
-                      耗时 {formatDurationSeconds(item.duration_ms)}
+                      Duration {formatDurationSeconds(item.duration_ms)}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge status={item.status} text={resultText(item.status)} />
                     {canOpen && (
                       <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-xs font-bold text-slate-600">
-                        详情
+                        Details
                       </span>
                     )}
                   </div>

@@ -38,21 +38,21 @@ export function JobsPage({
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-base font-extrabold">
             <Activity size={18} />
-            任务列表
+            Jobs
           </div>
           <button
             onClick={openTask}
             disabled={busy}
             className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
           >
-            创建任务
+            Create Job
           </button>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {jobs.length === 0 && (
             <EmptyState
-              title="暂无任务"
-              description="点击右上角“创建任务”开始注册或登录换 token。"
+              title="No jobs yet"
+              description="Click Create Job to start a registration or token refresh flow."
             />
           )}
           {jobs.map((j) => (
@@ -77,16 +77,16 @@ export function JobsPage({
                 <div>
                   <div className="text-base font-black">#{j.id}</div>
                   <div className="mt-1 text-sm text-slate-500">
-                    {jobTypeText(j.type)}任务 · {j.total_count} 个邮箱
+                    {jobTypeText(j.type)} job · {j.total_count} mailboxes
                   </div>
                 </div>
                 <Badge status={j.status} text={jobStatusText(j.status)} />
               </div>
               <div className="mt-3 grid grid-cols-4 gap-2 text-center text-sm">
-                <MiniStat label="成功" value={j.success_count} />
-                <MiniStat label="失败" value={j.failed_count} />
-                <MiniStat label="总数" value={j.total_count} />
-                <MiniStat label="成功率" value={Number(j.success_rate.toFixed(1))} />
+                <MiniStat label="Success" value={j.success_count} />
+                <MiniStat label="Failed" value={j.failed_count} />
+                <MiniStat label="Total" value={j.total_count} />
+                <MiniStat label="Success %" value={Number(j.success_rate.toFixed(1))} />
               </div>
               <div className="mt-3 flex items-center justify-between gap-2">
                 <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
@@ -107,7 +107,7 @@ export function JobsPage({
                     disabled={busy}
                     className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"
                   >
-                    结束
+                    Stop
                   </button>
                 ) : null}
               </div>

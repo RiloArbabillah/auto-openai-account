@@ -75,26 +75,26 @@ export function CreateTaskModal({
       );
   }
   const flowOptions: { value: TaskFlow; label: string }[] = [
-    { value: "register_login", label: "注册 + 普通登录" },
-    { value: "register_codex", label: "注册 + 普通登录 + Codex 授权登录" },
-    { value: "login", label: "普通登录" },
-    { value: "codex_login", label: "Codex 授权登录" },
+    { value: "register_login", label: "Register + Standard Login" },
+    { value: "register_codex", label: "Register + Standard Login + Codex Auth Login" },
+    { value: "login", label: "Standard Login" },
+    { value: "codex_login", label: "Codex Auth Login" },
   ];
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-3 backdrop-blur-sm">
       <div className="w-full max-w-3xl rounded-2xl border bg-white p-4 shadow-soft">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-black">创建任务</h2>
+            <h2 className="text-lg font-black">Create Job</h2>
             <p className="mt-1 text-sm text-slate-500">
-              选择任务类型，并配置本次任务参数。
+              Choose a job type and configure the runtime settings for this run.
             </p>
           </div>
           <button
             onClick={onClose}
             className="rounded-full border px-3 py-1 text-slate-500"
           >
-            关闭
+            Close
           </button>
         </div>
         <div className="mb-3 flex flex-wrap gap-2">
@@ -114,7 +114,7 @@ export function CreateTaskModal({
           ))}
         </div>
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="并发数量">
+          <Field label="Concurrency">
             <input
               className={styles.input}
               type="number"
@@ -128,7 +128,7 @@ export function CreateTaskModal({
               }
             />
           </Field>
-          <Field label="代理模式">
+          <Field label="Proxy Mode">
             <select
               className={`${styles.input} ${styles.selectInput}`}
               value={draft.proxy_mode}
@@ -136,16 +136,16 @@ export function CreateTaskModal({
                 setDraft({ ...draft, proxy_mode: e.target.value })
               }
             >
-              <option value="local">本地网络（不使用代理）</option>
-              <option value="random">随机</option>
-              <option value="single">固定第一条</option>
-              <option value="round_robin">轮询</option>
+              <option value="local">Local Network (No Proxy)</option>
+              <option value="random">Random</option>
+              <option value="single">Use First Proxy</option>
+              <option value="round_robin">Round Robin</option>
             </select>
           </Field>
         </div>
         {isRegisterFlow && (
           <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <Field label={`注册数量（可用未使用邮箱 ${unused.length} 个）`}>
+            <Field label={`Register Count (${unused.length} unused mailboxes available)`}>
               <input
                 className={styles.input}
                 type="number"
@@ -155,7 +155,7 @@ export function CreateTaskModal({
                 onChange={(e) => setCount(Number(e.target.value))}
               />
             </Field>
-            <Field label="密码模式">
+            <Field label="Password Mode">
               <select
                 className={`${styles.input} ${styles.selectInput}`}
                 value={draft.password_mode}
@@ -163,12 +163,12 @@ export function CreateTaskModal({
                   setDraft({ ...draft, password_mode: e.target.value })
                 }
               >
-                <option value="random">随机生成</option>
-                <option value="fixed">固定密码</option>
+                <option value="random">Generate Randomly</option>
+                <option value="fixed">Fixed Password</option>
               </select>
             </Field>
             {draft.password_mode === "fixed" && (
-              <Field label="固定密码">
+              <Field label="Fixed Password">
                 <input
                   className={styles.input}
                   value={draft.fixed_password || defaultPassword}
@@ -182,34 +182,34 @@ export function CreateTaskModal({
         )}
         {!isRegisterFlow && (
           <div className="mt-3 grid gap-3 md:grid-cols-1">
-            <Field label="邮箱状态筛选">
+            <Field label="Mailbox Status Filter">
               <select
                 className={`${styles.input} ${styles.selectInput}`}
                 value={loginFilter}
                 onChange={(e) => setLoginFilter(e.target.value)}
               >
-                <option value="used">全部已使用</option>
-                <option value="registered">已注册</option>
-                <option value="abnormal">异常</option>
+                <option value="used">All Used</option>
+                <option value="registered">Registered</option>
+                <option value="abnormal">Abnormal</option>
               </select>
               <p className="mt-2 text-sm text-slate-500">
                 <span className="font-bold text-slate-800">
                   {loginCandidates.length}
                 </span>{" "}
-                个邮箱将创建登录任务
+                mailboxes will be included in the login job
               </p>
             </Field>
           </div>
         )}
         {isCodexFlow && (
           <div className="mt-3">
-            <Field label="SMS 配置">
+            <Field label="SMS Configuration">
               <select
                 className={`${styles.input} ${styles.selectInput}`}
                 value={smsConfigName}
                 onChange={(e) => setSMSConfigName(e.target.value)}
               >
-                <option value="">请选择 SMS 配置</option>
+                <option value="">Select an SMS configuration</option>
                 {draft.sms_configs.map((config) => (
                   <option key={config.name} value={config.name}>
                     {config.name} · {config.platform}
@@ -217,11 +217,11 @@ export function CreateTaskModal({
                 ))}
               </select>
               {!selectedSMSExists && (
-                <p className="mt-2 text-sm font-semibold text-rose-600">
-                  Codex 流程必须选择有效的 SMS 配置。
-                </p>
-              )}
-            </Field>
+                  <p className="mt-2 text-sm font-semibold text-rose-600">
+                    Codex flows require a valid SMS configuration.
+                  </p>
+                )}
+              </Field>
           </div>
         )}
         <div className="mt-4 flex justify-end gap-2">
@@ -229,7 +229,7 @@ export function CreateTaskModal({
             onClick={onClose}
             className="rounded-xl border bg-white px-3 py-2 font-bold"
           >
-            取消
+            Cancel
           </button>
           <button
             onClick={submit}
@@ -240,7 +240,7 @@ export function CreateTaskModal({
             }
             className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
           >
-            创建任务
+            Create Job
           </button>
         </div>
       </div>

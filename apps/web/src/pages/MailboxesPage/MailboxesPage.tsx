@@ -41,11 +41,11 @@ export function MailboxesPage({
   }, {});
   const usedCount = mailboxes.length - (counts.new || 0);
   const tabs: { key: MailboxView; label: string; value: number }[] = [
-    { key: "all", label: "全部", value: mailboxes.length },
-    { key: "unused", label: "未使用", value: counts.new || 0 },
-    { key: "used", label: "已使用", value: usedCount },
-    { key: "registered", label: "已注册", value: counts.registered || 0 },
-    { key: "abnormal", label: "异常", value: counts.abnormal || 0 },
+    { key: "all", label: "All", value: mailboxes.length },
+    { key: "unused", label: "Unused", value: counts.new || 0 },
+    { key: "used", label: "Used", value: usedCount },
+    { key: "registered", label: "Registered", value: counts.registered || 0 },
+    { key: "abnormal", label: "Abnormal", value: counts.abnormal || 0 },
   ];
   const visible = mailboxes.filter((m) => {
     if (view === "all") return true;
@@ -81,7 +81,7 @@ export function MailboxesPage({
   async function confirmDelete() {
     if (
       selected.length &&
-      window.confirm(`确定删除 ${selected.length} 个邮箱吗？`)
+      window.confirm(`Delete ${selected.length} mailboxes?`)
     ) {
       await deleteMailboxes(selected);
       setSelected([]);
@@ -90,7 +90,7 @@ export function MailboxesPage({
   async function confirmReset() {
     if (
       selected.length &&
-      window.confirm(`确定重置 ${selected.length} 个邮箱为未使用吗？`)
+      window.confirm(`Reset ${selected.length} mailboxes back to unused?`)
     ) {
       await resetMailboxes(selected);
       setSelected([]);
@@ -98,14 +98,14 @@ export function MailboxesPage({
   }
   return (
     <div className="space-y-4">
-      <Card title="邮箱池" icon={<Database size={18} />}>
+      <Card title="Mailbox Pool" icon={<Database size={18} />}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-            <MiniStat label="全部" value={mailboxes.length} />
-            <MiniStat label="未使用" value={counts.new || 0} />
-            <MiniStat label="已使用" value={usedCount} />
-            <MiniStat label="已注册" value={counts.registered || 0} />
-            <MiniStat label="异常" value={counts.abnormal || 0} />
+            <MiniStat label="All" value={mailboxes.length} />
+            <MiniStat label="Unused" value={counts.new || 0} />
+            <MiniStat label="Used" value={usedCount} />
+            <MiniStat label="Registered" value={counts.registered || 0} />
+            <MiniStat label="Abnormal" value={counts.abnormal || 0} />
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -113,33 +113,33 @@ export function MailboxesPage({
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 font-bold text-white"
             >
               <UploadCloud size={16} />
-              批量导入
+              Bulk Import
             </button>
             <button
               onClick={() => startLoginJob(selected)}
               disabled={busy || selected.length === 0}
               className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
             >
-              批量登录
+              Bulk Login
             </button>
             <button
               onClick={confirmReset}
               disabled={busy || selected.length === 0}
               className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
             >
-              重置未使用
+              Reset to Unused
             </button>
             <button
               onClick={confirmDelete}
               disabled={busy || selected.length === 0}
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 font-bold text-rose-700 disabled:opacity-50"
             >
-              批量删除
+              Bulk Delete
             </button>
           </div>
         </div>
       </Card>
-      <Card title="邮箱列表" icon={<Database size={18} />}>
+      <Card title="Mailbox List" icon={<Database size={18} />}>
         <div className="mb-3 flex flex-wrap gap-2">
           {tabs.map((tab) => (
             <button
@@ -160,7 +160,7 @@ export function MailboxesPage({
             </button>
           ))}
         </div>
-        <DataTable headers={["", "邮箱", "状态", "任务", "结果", "操作"]} minWidth="52rem">
+        <DataTable headers={["", "Email", "Status", "Job", "Result", "Actions"]} minWidth="52rem">
           {pageItems.map((m) => (
             <tr key={m.id}>
               <td>
@@ -174,7 +174,7 @@ export function MailboxesPage({
               <td>
                 <Badge
                   status={m.status}
-                  text={m.status === "new" ? "未使用" : m.status_text}
+                    text={m.status === "new" ? "Unused" : m.status_text}
                 />
               </td>
               <td>
@@ -203,19 +203,19 @@ export function MailboxesPage({
                     onClick={() => openMailboxDetail(m)}
                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
                   >
-                    详情
+                    Details
                   </button>
                   <button
                     onClick={() => startLoginJob([m.id])}
                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
                   >
-                    登录
+                    Login
                   </button>
                   <button
                     onClick={() => resetMailboxes([m.id])}
                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
                   >
-                    重置
+                    Reset
                   </button>
                 </div>
               </td>
@@ -225,11 +225,11 @@ export function MailboxesPage({
         {visible.length === 0 && (
           <div className="mt-3">
             <EmptyState
-              title="暂无邮箱"
+              title="No mailboxes yet"
               description={
                 mailboxes.length === 0
-                  ? "点击上方“批量导入”添加邮箱后，可在这里查看和管理。"
-                  : "当前筛选条件下没有邮箱，切换分类后再查看。"
+                  ? "Use Bulk Import above to add mailboxes, then manage them here."
+                  : "No mailboxes match the current filter. Change the filter and try again."
               }
             />
           </div>
@@ -237,16 +237,16 @@ export function MailboxesPage({
         <div className="mt-3 flex items-center gap-3 text-sm text-slate-500">
           <label className="inline-flex items-center gap-2">
             <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-            全选当前页
+            Select current page
           </label>
           <span>
-            已选择 {selected.length} 个邮箱，当前显示 {pageItems.length} / {visible.length} 个
+            Selected {selected.length} mailboxes, showing {pageItems.length} / {visible.length}
           </span>
         </div>
         {visible.length > pageSize && (
           <div className="mt-3 flex flex-col gap-2 rounded-xl border bg-slate-50 p-3 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              第 {currentPage} / {totalPages} 页，每页 {pageSize} 条
+              Page {currentPage} / {totalPages}, {pageSize} per page
             </span>
             <div className="flex gap-2">
               <button
@@ -255,7 +255,7 @@ export function MailboxesPage({
                 disabled={currentPage === 1}
                 className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
               >
-                首页
+                First
               </button>
               <button
                 type="button"
@@ -263,7 +263,7 @@ export function MailboxesPage({
                 disabled={currentPage === 1}
                 className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
               >
-                上一页
+                Prev
               </button>
               <button
                 type="button"
@@ -271,7 +271,7 @@ export function MailboxesPage({
                 disabled={currentPage === totalPages}
                 className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
               >
-                下一页
+                Next
               </button>
               <button
                 type="button"
@@ -279,14 +279,14 @@ export function MailboxesPage({
                 disabled={currentPage === totalPages}
                 className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
               >
-                末页
+                Last
               </button>
             </div>
           </div>
         )}
       </Card>
       {importOpen && (
-        <Modal title="批量导入邮箱" onClose={() => setImportOpen(false)}>
+        <Modal title="Bulk Import Mailboxes" onClose={() => setImportOpen(false)}>
           <textarea
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
@@ -298,14 +298,14 @@ export function MailboxesPage({
               onClick={() => setImportOpen(false)}
               className="rounded-xl border bg-white px-3 py-2 font-bold"
             >
-              取消
+              Cancel
             </button>
             <button
               onClick={submitImport}
               disabled={busy}
               className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
             >
-              确认导入
+              Import
             </button>
           </div>
         </Modal>

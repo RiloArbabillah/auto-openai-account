@@ -15,7 +15,7 @@ export function LogPanel({
 }) {
   return (
     <Card
-      title={activeJob ? `任务 #${activeJob.id} 实时日志` : "实时日志"}
+      title={activeJob ? `Job #${activeJob.id} Live Logs` : "Live Logs"}
       icon={<Database size={18} />}
       className="min-h-0"
     >
@@ -26,8 +26,8 @@ export function LogPanel({
       >
         {logs.length === 0 && (
           <EmptyState
-            title="暂无日志"
-            description="任务运行时，实时日志会显示在这里。"
+            title="No logs yet"
+            description="Live runtime logs will appear here while a job is running."
             compact
           />
         )}

@@ -43,20 +43,20 @@ export function Overview({
     <div className="flex min-h-0 flex-col lg:h-[calc(100vh-5.75rem)]">
       <section className="mb-4 shrink-0 grid gap-4 lg:grid-cols-2">
         <div className="grid grid-cols-2 gap-2 rounded-2xl border border-slate-200/70 bg-white/80 p-3 shadow-soft backdrop-blur sm:grid-cols-3">
-          <Stat label="代理池" value={stats.proxyCount} />
-          <Stat label="未使用" value={stats.newCount} />
-          <Stat label="注册中" value={stats.runningCount} />
-          <Stat label="登陆中" value={stats.loginingCount} />
-          <Stat label="已注册" value={stats.registered} />
-          <Stat label="异常" value={stats.abnormal} />
+          <Stat label="Proxies" value={stats.proxyCount} />
+          <Stat label="Unused" value={stats.newCount} />
+          <Stat label="Registering" value={stats.runningCount} />
+          <Stat label="Logging In" value={stats.loginingCount} />
+          <Stat label="Registered" value={stats.registered} />
+          <Stat label="Abnormal" value={stats.abnormal} />
         </div>
         <div className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-soft backdrop-blur">
           <p className="mb-1 text-xs font-bold uppercase tracking-wide text-slate-500">Modern SaaS Console</p>
           <h1 className="max-w-3xl text-2xl font-black tracking-[-0.04em]">
-            批量注册、代理池和实时日志在一个控制台里全完成。
+            Run bulk registration, proxy routing, and live logs from one control panel.
           </h1>
           <p className="mt-2 text-sm text-slate-500">
-            从创建任务开始，选择注册或登录换 token，并配置并发、密码和代理策略。
+            Start with a job, choose registration or token refresh, then tune concurrency, passwords, and proxy strategy.
           </p>
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <button
@@ -64,7 +64,7 @@ export function Overview({
               className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 font-bold"
             >
               <RefreshCw size={16} />
-              刷新
+              Refresh
             </button>
             <button
               onClick={openTask}
@@ -72,7 +72,7 @@ export function Overview({
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 font-bold text-white shadow-lg disabled:opacity-50"
             >
               <Play size={16} />
-              创建任务
+              Create Job
             </button>
           </div>
         </div>

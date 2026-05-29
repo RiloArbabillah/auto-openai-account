@@ -28,7 +28,7 @@ export function Modal({
             onClick={onClose}
             className="rounded-full border px-3 py-1 text-slate-500"
           >
-            关闭
+            Close
           </button>
         </div>
         {children}

@@ -2,38 +2,38 @@ import type { Job, Mailbox } from "../types";
 
 export function jobTypeText(type?: string) {
   return type === "login"
-    ? "普通登录"
+    ? "Standard Login"
     : type === "codex_login"
-      ? "Codex授权登录"
+      ? "Codex Auth Login"
       : type === "register_login"
-        ? "注册+普通登录"
+        ? "Register + Standard Login"
         : type === "register_codex"
-          ? "注册+普通登录+Codex授权"
-          : "注册";
+          ? "Register + Standard Login + Codex Auth Login"
+          : "Register";
 }
 
 export function jobStatusText(status?: string) {
   return status === "running"
-    ? "运行中"
+    ? "Running"
     : status === "finished"
-      ? "已完成"
+      ? "Finished"
       : status === "stopped"
-        ? "已结束"
+        ? "Stopped"
         : status === "failed"
-          ? "失败"
+          ? "Failed"
           : status || "-";
 }
 
 export function resultText(status?: string) {
   return status === "success"
-    ? "成功"
+    ? "Success"
     : status === "failed"
-      ? "失败"
+      ? "Failed"
       : status || "-";
 }
 
 export function formatDurationSeconds(durationMs: number) {
-  return `${(durationMs / 1000).toFixed(1)}秒`;
+  return `${(durationMs / 1000).toFixed(1)}s`;
 }
 
 export function canExportJobTokens(job: Job) {
@@ -62,7 +62,7 @@ export function downloadJsonFile(filename: string, data: unknown) {
 }
 
 export function formatToken(token?: string) {
-  if (!token) return "暂无 token";
+  if (!token) return "No token available";
   try {
     return JSON.stringify(JSON.parse(token), null, 2);
   } catch {

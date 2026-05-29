@@ -63,7 +63,7 @@ function serviceLabel(service: SMSCatalogService) {
 }
 
 function countryLabel(country: SMSCatalogCountry) {
-  const name = country.chn || country.eng || country.rus || `国家 ${country.id}`;
+  const name = country.eng || country.chn || country.rus || `Country ${country.id}`;
   return `${name} (${country.id})`;
 }
 
@@ -73,7 +73,7 @@ function platformLabel(value: string) {
 
 function maskAPIKey(value: string) {
   const trimmed = value.trim();
-  if (!trimmed) return "未填写";
+  if (!trimmed) return "Not set";
   if (trimmed.length <= 8) return `${trimmed.slice(0, 2)}****${trimmed.slice(-2)}`;
   return `${trimmed.slice(0, 6)}****${trimmed.slice(-4)}`;
 }
@@ -124,7 +124,7 @@ export function SmsSettingsPage({
     "mt-1 w-full rounded-xl border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500";
   const selectClass = `${inputClass} appearance-none pr-10`;
   const isEditing = editingIndex !== null;
-  const submitText = isEditing ? "保存配置" : "添加配置";
+  const submitText = isEditing ? "Save Configuration" : "Add Configuration";
 
   const configNames = useMemo(
     () => smsConfigs.map((config) => config.name.trim()).filter(Boolean),
@@ -135,7 +135,7 @@ export function SmsSettingsPage({
     const services = catalog?.services || [];
     const current = form.service_id || "dr";
     if (!services.some((service) => service.code === current)) {
-      return [{ code: current, name: "当前服务" }, ...services];
+      return [{ code: current, name: "Current Service" }, ...services];
     }
     return services;
   }, [catalog?.services, form.service_id]);
@@ -144,7 +144,7 @@ export function SmsSettingsPage({
     const countries = catalog?.countries || [];
     const current = Number(form.country_id) || 38;
     if (!countries.some((country) => country.id === current)) {
-      return [{ id: current, chn: "当前国家/地区" }, ...countries];
+      return [{ id: current, eng: "Current Country/Region" }, ...countries];
     }
     return countries;
   }, [catalog?.countries, form.country_id]);
@@ -183,25 +183,25 @@ export function SmsSettingsPage({
 
   function validateForm() {
     const normalized = normalizeSMSConfig(form);
-    if (!normalized.name) return "请输入配置名称";
+    if (!normalized.name) return "Enter a configuration name";
     if (normalized.platform !== "smsbower" && normalized.platform !== "hero-sms") {
-      return "请选择支持的 SMS 平台";
+      return "Select a supported SMS platform";
     }
-    if (!normalized.api_key) return "请输入 API 密钥";
-    if (!normalized.service_id) return "请选择服务";
+    if (!normalized.api_key) return "Enter an API key";
+    if (!normalized.service_id) return "Select a service";
     const countryID = Number(form.country_id);
     const maxPrice = Number(form.max_price);
     if (!Number.isFinite(countryID) || countryID <= 0) {
-      return "请选择国家/地区";
+      return "Select a country or region";
     }
     if (!Number.isFinite(maxPrice) || maxPrice < 0) {
-      return "最高价格不能小于 0";
+      return "Max price cannot be less than 0";
     }
     const duplicate = configNames.some((name, index) => {
       if (editingIndex !== null && index === editingIndex) return false;
       return name === normalized.name;
     });
-    if (duplicate) return "配置名称不能重复";
+    if (duplicate) return "Configuration names must be unique";
     return "";
   }
 
@@ -261,7 +261,7 @@ export function SmsSettingsPage({
   async function loadCatalog() {
     const apiKey = form.api_key.trim();
     if (!apiKey) {
-      setCatalogError("请先输入 API 密钥");
+      setCatalogError("Enter the API key first");
       return;
     }
     setCatalogLoading(true);
@@ -273,7 +273,7 @@ export function SmsSettingsPage({
         countries: result.countries || [],
       });
     } catch (error) {
-      setCatalogError(error instanceof Error ? error.message : "获取列表失败");
+      setCatalogError(error instanceof Error ? error.message : "Failed to load catalog");
     } finally {
       setCatalogLoading(false);
     }
@@ -282,7 +282,7 @@ export function SmsSettingsPage({
   return (
     <>
       <Card
-        title="SMS 配置"
+        title="SMS Settings"
         icon={<MessageSquareText size={18} />}
         actions={
           <button
@@ -291,7 +291,7 @@ export function SmsSettingsPage({
             className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-bold"
           >
             <Plus size={16} />
-            新增配置
+            Add Configuration
           </button>
         }
       >
@@ -299,8 +299,8 @@ export function SmsSettingsPage({
           {smsConfigs.length === 0 && (
             <div className="lg:col-span-2">
               <EmptyState
-                title="暂无 SMS 配置"
-                description="Codex 授权登录任务需要先保存一条 SMS 配置。"
+                title="No SMS configurations yet"
+                description="Save at least one SMS configuration before running Codex auth login jobs."
               />
             </div>
           )}
@@ -319,15 +319,15 @@ export function SmsSettingsPage({
                       {platformLabel(config.platform)}
                     </span>
                     {editingIndex === index && (
-                      <Badge status="running" text="编辑中" />
+                      <Badge status="running" text="Editing" />
                     )}
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    <ConfigMetric label="服务" value={config.service_id || "dr"} />
-                    <ConfigMetric label="国家/地区" value={config.country_id || 38} />
-                    <ConfigMetric label="最高价格" value={config.max_price || 0} />
+                    <ConfigMetric label="Service" value={config.service_id || "dr"} />
+                    <ConfigMetric label="Country/Region" value={config.country_id || 38} />
+                    <ConfigMetric label="Max Price" value={config.max_price || 0} />
                     <ConfigMetric
-                      label="API 密钥"
+                      label="API Key"
                       value={maskAPIKey(config.api_key || "")}
                       icon={<KeyRound size={15} />}
                     />
@@ -340,7 +340,7 @@ export function SmsSettingsPage({
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-black shadow-sm"
                   >
                     <Pencil size={16} />
-                    编辑
+                    Edit
                   </button>
                   <button
                     type="button"
@@ -349,7 +349,7 @@ export function SmsSettingsPage({
                     className="inline-flex h-11 items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 text-sm font-black text-rose-700 shadow-sm disabled:opacity-50"
                   >
                     <Trash2 size={16} />
-                    删除
+                    Delete
                   </button>
                 </div>
               </div>
@@ -359,13 +359,13 @@ export function SmsSettingsPage({
       </Card>
       {formOpen && (
         <Modal
-          title={isEditing ? "编辑 SMS 配置" : "新增 SMS 配置"}
+          title={isEditing ? "Edit SMS Configuration" : "Add SMS Configuration"}
           subtitle="Hero SMS / SMSBower"
           onClose={closeForm}
         >
           <div className="grid gap-3 md:grid-cols-2">
             <label className="text-sm font-bold text-slate-600">
-              配置名称
+              Configuration Name
               <input
                 className={inputClass}
                 value={form.name}
@@ -375,7 +375,7 @@ export function SmsSettingsPage({
               />
             </label>
             <label className="text-sm font-bold text-slate-600">
-              短信平台
+              SMS Platform
               <span className="relative block">
                 <select
                   className={selectClass}
@@ -397,11 +397,11 @@ export function SmsSettingsPage({
               </span>
             </label>
             <label className="text-sm font-bold text-slate-600 md:col-span-2">
-              API 密钥
+              API Key
               <input
                 className={`${inputClass} font-mono`}
                 value={form.api_key}
-                placeholder="粘贴短信平台 API 密钥"
+                placeholder="Paste the SMS platform API key"
                 autoComplete="off"
                 onChange={(event) => updateForm({ api_key: event.target.value })}
               />
@@ -414,11 +414,11 @@ export function SmsSettingsPage({
                 className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
               >
                 <RefreshCw size={16} />
-                {catalogLoading ? "获取中..." : "获取服务和国家"}
+                {catalogLoading ? "Loading..." : "Load Services and Countries"}
               </button>
               {catalog && (
                 <span className="ml-3 text-sm font-semibold text-slate-500">
-                  已加载 {catalog.services.length} 个服务，{catalog.countries.length} 个国家/地区
+                  Loaded {catalog.services.length} services and {catalog.countries.length} countries/regions
                 </span>
               )}
               {catalogError && (
@@ -428,7 +428,7 @@ export function SmsSettingsPage({
               )}
             </div>
             <label className="text-sm font-bold text-slate-600">
-              服务
+              Service
               <span className="relative block">
                 <select
                   className={selectClass}
@@ -450,7 +450,7 @@ export function SmsSettingsPage({
               </span>
             </label>
             <label className="text-sm font-bold text-slate-600">
-              国家/地区
+              Country/Region
               <span className="relative block">
                 <select
                   className={selectClass}
@@ -472,7 +472,7 @@ export function SmsSettingsPage({
               </span>
             </label>
             <label className="text-sm font-bold text-slate-600 md:col-span-2">
-              最高价格
+              Max Price
               <input
                 className={inputClass}
                 type="number"
@@ -498,7 +498,7 @@ export function SmsSettingsPage({
               className="inline-flex items-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
             >
               <X size={16} />
-              取消
+              Cancel
             </button>
             <button
               type="button"
@@ -507,7 +507,7 @@ export function SmsSettingsPage({
               className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
             >
               {isEditing ? <Save size={16} /> : <Plus size={16} />}
-              {busy || saving ? "保存中..." : submitText}
+              {busy || saving ? "Saving..." : submitText}
             </button>
           </div>
         </Modal>

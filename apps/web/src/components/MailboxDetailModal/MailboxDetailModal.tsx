@@ -28,32 +28,32 @@ export function MailboxDetailModal({
 }) {
   return (
     <Modal
-      title="邮箱详情"
+      title="Mailbox Details"
       subtitle={detailDraft.email || detail.email}
       onClose={onClose}
     >
       <div className="space-y-3 text-sm">
-        <Field label="OpenAI 密码">
+        <Field label="OpenAI Password">
           <input
             value={detailDraft.register_password || ""}
             onChange={(event) =>
               onUpdateDraft("register_password", event.target.value)
             }
             className="w-full rounded-xl border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="OpenAI 登录密码"
+            placeholder="OpenAI login password"
           />
         </Field>
         <InfoRow
-          label="最近任务"
+          label="Latest Job"
           value={
             detail.last_job_id
               ? `#${detail.last_job_id} ${jobTypeText(detail.last_job_type)} ${resultText(detail.last_job_status)}`
               : "-"
           }
         />
-        <InfoRow label="绑定手机号" value={detail.phone_number || "-"} />
+        <InfoRow label="Phone Number" value={detail.phone_number || "-"} />
         <InfoRow
-          label="失败信息"
+          label="Last Error"
           value={detail.last_job_error || detail.last_error || "-"}
         />
         <div>
@@ -68,9 +68,9 @@ export function MailboxDetailModal({
             onClick={onToggleCredentials}
             className="flex w-full items-center justify-between gap-3 text-left font-bold text-slate-700"
           >
-            <span>邮箱凭据</span>
+            <span>Mailbox Credentials</span>
             <span className="text-xs text-slate-500">
-              {credentialsOpen ? "收起" : "展开"}
+              {credentialsOpen ? "Collapse" : "Expand"}
             </span>
           </button>
           {credentialsOpen && (
@@ -93,7 +93,7 @@ export function MailboxDetailModal({
             onClick={onClose}
             className="rounded-xl border bg-white px-3 py-2 font-bold"
           >
-            取消
+            Cancel
           </button>
           <button
             type="button"
@@ -101,7 +101,7 @@ export function MailboxDetailModal({
             disabled={busy || !detailDraft.email.trim()}
             className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
           >
-            保存
+            Save
           </button>
         </div>
       </div>

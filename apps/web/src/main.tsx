@@ -26,9 +26,9 @@ const themeOptions: Array<{
   icon: string;
   title: string;
 }> = [
-  { value: "system", label: "跟随系统", icon: "A", title: "切换到浅色模式" },
-  { value: "light", label: "浅色", icon: "L", title: "切换到深色模式" },
-  { value: "dark", label: "深色", icon: "D", title: "切换到跟随系统" },
+  { value: "system", label: "System", icon: "A", title: "Switch to light mode" },
+  { value: "light", label: "Light", icon: "L", title: "Switch to dark mode" },
+  { value: "dark", label: "Dark", icon: "D", title: "Switch to system mode" },
 ];
 
 function readThemePreference(): ThemePreference {
@@ -177,7 +177,7 @@ function App() {
   }, [themePreference]);
 
   useEffect(() => {
-    const title = routeTitles[location.pathname] || "总览";
+    const title = routeTitles[location.pathname] || "Overview";
     document.title = `${title} - ${appName}`;
   }, [location.pathname]);
 
@@ -235,12 +235,12 @@ function App() {
         body: JSON.stringify({ text: importText }),
       });
       showToast(
-        `导入完成：新增 ${result.imported}，跳过 ${result.skipped}，失败 ${result.failed}`,
+        `Import complete: added ${result.imported}, skipped ${result.skipped}, failed ${result.failed}`,
         "success",
       );
       await refresh();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "导入失败", "error");
+      showToast(error instanceof Error ? error.message : "Import failed", "error");
     } finally {
       setBusy(false);
     }
@@ -261,11 +261,11 @@ function App() {
       });
       setActiveJob(job);
       setTaskOpen(false);
-      showToast(`注册任务 #${job.id} 已启动`, "success");
+      showToast(`Registration job #${job.id} started`, "success");
       await refresh(job.id);
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "启动注册任务失败",
+          error instanceof Error ? error.message : "Failed to start registration job",
         "error",
       );
     } finally {
@@ -289,11 +289,11 @@ function App() {
       });
       setActiveJob(job);
       setTaskOpen(false);
-      showToast(`登录任务 #${job.id} 已启动`, "success");
+      showToast(`Login job #${job.id} started`, "success");
       await refresh(job.id);
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "启动登录任务失败",
+          error instanceof Error ? error.message : "Failed to start login job",
         "error",
       );
     } finally {
@@ -308,11 +308,11 @@ function App() {
       await Promise.all(
         ids.map((id) => api(`/api/mailboxes/${id}`, { method: "DELETE" })),
       );
-      showToast(`已删除 ${ids.length} 个邮箱`, "success");
+      showToast(`Deleted ${ids.length} mailboxes`, "success");
       await refresh();
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "删除邮箱失败",
+          error instanceof Error ? error.message : "Failed to delete mailboxes",
         "error",
       );
     } finally {
@@ -332,11 +332,11 @@ function App() {
           }),
         ),
       );
-      showToast(`已重置 ${ids.length} 个邮箱为未使用`, "success");
+      showToast(`Reset ${ids.length} mailboxes to unused`, "success");
       await refresh();
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "重置邮箱失败",
+          error instanceof Error ? error.message : "Failed to reset mailboxes",
         "error",
       );
     } finally {
@@ -354,11 +354,11 @@ function App() {
       setMailboxes((items) =>
         items.map((item) => (item.id === id ? result.item : item)),
       );
-      showToast("邮箱详情已保存", "success");
+      showToast("Mailbox details saved", "success");
       await refresh();
       return result.item;
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "保存邮箱失败", "error");
+      showToast(error instanceof Error ? error.message : "Failed to save mailbox", "error");
       throw error;
     } finally {
       setBusy(false);
@@ -418,18 +418,18 @@ function App() {
   }
 
   async function stopTask(id: number) {
-    if (!window.confirm(`确定结束任务 #${id} 吗？`)) return;
+    if (!window.confirm(`Stop job #${id}?`)) return;
     setBusy(true);
     try {
       const result = await api<{ job: Job }>(`/api/register-jobs/${id}/stop`, {
         method: "POST",
       });
       setActiveJob(result.job);
-      showToast(`任务 #${id} 已结束`, "success");
+      showToast(`Job #${id} stopped`, "success");
       await refresh();
     } catch (error) {
       showToast(
-        error instanceof Error ? error.message : "结束任务失败",
+          error instanceof Error ? error.message : "Failed to stop job",
         "error",
       );
     } finally {
@@ -450,7 +450,7 @@ function App() {
         items: result.items || [],
       });
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "导出 token 失败", "error");
+      showToast(error instanceof Error ? error.message : "Failed to export tokens", "error");
     } finally {
       setBusy(false);
     }
@@ -460,7 +460,7 @@ function App() {
     if (!tokenExportConfirm) return;
     const filename = `${formatFileDate(new Date())}_task-${tokenExportConfirm.jobId}_${tokenExportConfirm.count}.json`;
     downloadJsonFile(filename, tokenExportConfirm.items);
-    showToast(`已导出 ${tokenExportConfirm.count} 条 token`, "success");
+    showToast(`Exported ${tokenExportConfirm.count} tokens`, "success");
     setTokenExportConfirm(null);
   }
 
@@ -604,10 +604,10 @@ function App() {
                   showToast={showToast}
                   saveSettings={(next) =>
                     saveSettings(next)
-                      .then(() => showToast("代理池已更新", "success"))
+                        .then(() => showToast("Proxy pool updated", "success"))
                       .catch((e) =>
                         showToast(
-                          e instanceof Error ? e.message : "保存失败",
+                            e instanceof Error ? e.message : "Save failed",
                           "error",
                         ),
                       )
@@ -632,10 +632,10 @@ function App() {
                   saveSettings={async (next) => {
                     try {
                       await saveSettings(next);
-                      showToast("SMS 配置已更新", "success");
+                      showToast("SMS settings updated", "success");
                     } catch (e) {
                       showToast(
-                        e instanceof Error ? e.message : "保存失败",
+                        e instanceof Error ? e.message : "Save failed",
                         "error",
                       );
                       throw e;
@@ -653,8 +653,8 @@ function App() {
         type="button"
         className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-slate-200/70 bg-white/90 px-3 py-2 text-sm font-bold text-slate-700 shadow-soft backdrop-blur transition hover:text-slate-950 sm:bottom-5 sm:right-5"
         onClick={toggleThemePreference}
-        aria-label={`当前${themeOption.label}，${themeOption.title}`}
-        title={`${themeOption.label} · 当前为${resolvedTheme === "dark" ? "深色" : "浅色"}`}
+        aria-label={`Current theme ${themeOption.label}, ${themeOption.title}`}
+        title={`${themeOption.label} · currently ${resolvedTheme === "dark" ? "dark" : "light"}`}
       >
         <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-950 text-xs font-black text-white">
           {themeOption.icon}

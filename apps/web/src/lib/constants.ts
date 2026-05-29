@@ -4,18 +4,18 @@ export const emptyStats: Stats = { mailboxes: {}, jobs: {} };
 export const appName = "Auto OpenAI Account";
 export const defaultPassword = "Mima1234567890.";
 export const nav: Array<{ path: string; label: string; end?: boolean }> = [
-  { path: "/", label: "总览", end: true },
-  { path: "/mailboxes", label: "邮箱池" },
-  { path: "/jobs", label: "任务" },
-  { path: "/proxies", label: "代理池" },
-  { path: "/sms", label: "SMS 配置" },
-  { path: "/plugins", label: "插件" },
+  { path: "/", label: "Overview", end: true },
+  { path: "/mailboxes", label: "Mailboxes" },
+  { path: "/jobs", label: "Jobs" },
+  { path: "/proxies", label: "Proxies" },
+  { path: "/sms", label: "SMS Settings" },
+  { path: "/plugins", label: "Plugins" },
 ];
 export const routeTitles: Record<string, string> = {
-  "/": "总览",
-  "/mailboxes": "邮箱池",
-  "/jobs": "任务",
-  "/proxies": "代理池",
-  "/sms": "SMS 配置",
-  "/plugins": "插件",
+  "/": "Overview",
+  "/mailboxes": "Mailboxes",
+  "/jobs": "Jobs",
+  "/proxies": "Proxies",
+  "/sms": "SMS Settings",
+  "/plugins": "Plugins",
 };

@@ -39,7 +39,7 @@ export function ProxyPoolPage({
     if (!next.length) return;
     const invalid = next.find((item) => !isValidProxyURL(item));
     if (invalid) {
-      showToast(`代理格式不正确：${invalid}`, "error");
+      showToast(`Invalid proxy format: ${invalid}`, "error");
       return;
     }
     persist(
@@ -80,7 +80,7 @@ export function ProxyPoolPage({
               proxy,
               ok: false,
               latency_ms: 0,
-              error: error instanceof Error ? error.message : "测试失败",
+              error: error instanceof Error ? error.message : "Test failed",
             },
           }));
         } finally {
@@ -93,7 +93,7 @@ export function ProxyPoolPage({
   return (
     <>
       <Card
-        title="代理池"
+        title="Proxy Pool"
         icon={<PlugZap size={18} />}
         actions={
           <div className="flex gap-2">
@@ -101,14 +101,14 @@ export function ProxyPoolPage({
               onClick={() => setAddOpen(true)}
               className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"
             >
-              新增代理
+              Add Proxy
             </button>
             <button
               onClick={testAll}
               disabled={hasTesting}
               className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
             >
-              {hasTesting ? "测试中..." : "测试全部"}
+              {hasTesting ? "Testing..." : "Test All"}
             </button>
           </div>
         }
@@ -128,13 +128,13 @@ export function ProxyPoolPage({
                     disabled={isTesting}
                     className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
                   >
-                    {isTesting ? "测试中..." : "测速"}
+                    {isTesting ? "Testing..." : "Test"}
                   </button>
                   <button
                     onClick={() => remove(i)}
                     className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700"
                   >
-                    删除
+                    Delete
                   </button>
                 </div>
                 {r && (
@@ -142,10 +142,10 @@ export function ProxyPoolPage({
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge
                         status={r.ok ? "success" : "failed"}
-                        text={r.ok ? "可用" : "失败"}
+                        text={r.ok ? "Available" : "Failed"}
                       />
-                      <span>IP：{r.ip || "-"}</span>
-                      <span>延迟：{r.latency_ms}ms</span>
+                      <span>IP: {r.ip || "-"}</span>
+                      <span>Latency: {r.latency_ms}ms</span>
                       {r.error && (
                         <span className="text-rose-600">{r.error}</span>
                       )}
@@ -157,16 +157,16 @@ export function ProxyPoolPage({
           })}
           {!settingsDraft.proxies.length && (
             <EmptyState
-              title="暂无代理"
-              description="点击右上角“新增代理”添加代理后，可在这里测速和管理。"
+              title="No proxies yet"
+              description="Add proxies from the top-right button, then test and manage them here."
             />
           )}
         </div>
       </Card>
       {addOpen && (
         <Modal
-          title="新增代理"
-          subtitle="一行一个代理，支持 http、https、socks5、socks5h"
+          title="Add Proxies"
+          subtitle="One proxy per line. Supports http, https, socks5, and socks5h."
           onClose={() => setAddOpen(false)}
         >
           <textarea
@@ -180,13 +180,13 @@ export function ProxyPoolPage({
               onClick={() => setAddOpen(false)}
               className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"
             >
-              取消
+              Cancel
             </button>
             <button
               onClick={addFromText}
               className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-bold text-white"
             >
-              确认添加
+              Add Proxies
             </button>
           </div>
         </Modal>

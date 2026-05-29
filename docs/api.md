@@ -459,6 +459,20 @@ Returns a job with item details.
 
 Response: `RegisterJob` with `items`.
 
+### DELETE /api/register-jobs/{id}
+
+Deletes one ended job and its stored items/logs.
+
+Running jobs cannot be deleted.
+
+Response:
+
+```json
+{
+  "ok": true
+}
+```
+
 ### POST /api/register-jobs/{id}/stop
 
 Stops a running job.

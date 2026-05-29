@@ -17,6 +17,8 @@ export function JobsPage({
   openTask,
   openMailboxDetail,
   stopTask,
+  deleteTask,
+  deleteEndedTasks,
   exportJobTokens,
   selectJob,
   busy,
@@ -28,10 +30,14 @@ export function JobsPage({
   openTask: () => void;
   openMailboxDetail: (mailbox: Mailbox) => void;
   stopTask: (id: number) => void;
+  deleteTask: (id: number) => void;
+  deleteEndedTasks: () => void;
   exportJobTokens: (job: Job) => void;
   selectJob: (id: number) => void;
   busy: boolean;
 }) {
+  const endedJobs = jobs.filter((job) => job.status !== "running");
+
   return (
     <div className="grid min-h-0 gap-4 lg:h-[calc(100vh-5.75rem)] lg:grid-cols-[.85fr_1.15fr]">
       <div className="flex min-h-0 flex-col rounded-2xl border border-slate-200/70 bg-white/80 p-4 shadow-soft backdrop-blur">
@@ -40,13 +46,22 @@ export function JobsPage({
             <Activity size={18} />
             Jobs
           </div>
-          <button
-            onClick={openTask}
-            disabled={busy}
-            className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
-          >
-            Create Job
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={deleteEndedTasks}
+              disabled={busy || endedJobs.length === 0}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 font-bold text-rose-700 disabled:opacity-50"
+            >
+              {`Delete Ended Jobs (${endedJobs.length})`}
+            </button>
+            <button
+              onClick={openTask}
+              disabled={busy}
+              className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
+            >
+              Create Job
+            </button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {jobs.length === 0 && (
@@ -109,7 +124,19 @@ export function JobsPage({
                   >
                     Stop
                   </button>
-                ) : null}
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      deleteTask(j.id);
+                    }}
+                    disabled={busy}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           ))}

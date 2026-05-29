@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -472,6 +473,42 @@ func (s *Store) StopJob(jobID int64) error {
 		return err
 	}
 	return s.RecalculateJob(jobID, domain.JobStatusStopped)
+}
+
+func (s *Store) DeleteJob(jobID int64) (bool, error) {
+	job, err := s.GetJob(jobID, false)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	if job.Status == domain.JobStatusRunning {
+		return false, fmt.Errorf("running jobs cannot be deleted")
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM runtime_logs WHERE job_id=?`, jobID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(`DELETE FROM register_job_items WHERE job_id=?`, jobID); err != nil {
+		return false, err
+	}
+	res, err := tx.Exec(`DELETE FROM register_jobs WHERE id=?`, jobID)
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	if err := tx.Commit(); err != nil {
+		return false, err
+	}
+	return affected > 0, nil
 }
 func (s *Store) AddLog(log domain.RuntimeLog) (domain.RuntimeLog, error) {
 	if log.Level == "" {

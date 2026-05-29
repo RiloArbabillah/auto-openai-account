@@ -368,12 +368,28 @@ func (s *Server) handleRegisterJobByID(w http.ResponseWriter, r *http.Request) {
 	case "events":
 		s.handleJobEvents(w, r, id)
 	case "":
-		job, err := s.store.GetJob(id, true)
-		if err != nil {
-			writeError(w, 404, fmt.Errorf("register job not found"))
-			return
+		switch r.Method {
+		case http.MethodGet:
+			job, err := s.store.GetJob(id, true)
+			if err != nil {
+				writeError(w, 404, fmt.Errorf("register job not found"))
+				return
+			}
+			writeJSON(w, 200, job)
+		case http.MethodDelete:
+			deleted, err := s.store.DeleteJob(id)
+			if err != nil {
+				writeError(w, 400, err)
+				return
+			}
+			if !deleted {
+				writeError(w, 404, fmt.Errorf("register job not found"))
+				return
+			}
+			writeJSON(w, 200, map[string]any{"ok": true})
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
 		}
-		writeJSON(w, 200, job)
 	default:
 		http.NotFound(w, r)
 	}

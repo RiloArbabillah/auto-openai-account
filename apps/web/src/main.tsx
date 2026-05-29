@@ -437,6 +437,64 @@ function App() {
     }
   }
 
+  async function deleteTask(id: number) {
+    if (!window.confirm(`Delete job #${id}? This also removes its logs and items.`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await api(`/api/register-jobs/${id}`, { method: "DELETE" });
+      if (activeJob?.id === id) {
+        setActiveJob(null);
+        setLogs([]);
+      }
+      if (latestJob?.id === id) {
+        setLatestJob(null);
+        setLatestLogs([]);
+      }
+      showToast(`Job #${id} deleted`, "success");
+      await refresh();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete job",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteEndedTasks() {
+    const ids = jobs.filter((job) => job.status !== "running").map((job) => job.id);
+    if (ids.length === 0) return;
+    if (!window.confirm(`Delete ${ids.length} ended jobs? This also removes their logs and items.`)) {
+      return;
+    }
+    setBusy(true);
+    try {
+      await Promise.all(
+        ids.map((id) => api(`/api/register-jobs/${id}`, { method: "DELETE" })),
+      );
+      if (activeJob && ids.includes(activeJob.id)) {
+        setActiveJob(null);
+        setLogs([]);
+      }
+      if (latestJob && ids.includes(latestJob.id)) {
+        setLatestJob(null);
+        setLatestLogs([]);
+      }
+      showToast(`Deleted ${ids.length} ended jobs`, "success");
+      await refresh();
+    } catch (error) {
+      showToast(
+        error instanceof Error ? error.message : "Failed to delete ended jobs",
+        "error",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function exportJobTokens(job: Job) {
     if (!canExportJobTokens(job)) return;
     setBusy(true);
@@ -588,6 +646,8 @@ function App() {
                 openTask={() => setTaskOpen(true)}
                 openMailboxDetail={openMailboxDetail}
                 stopTask={stopTask}
+                deleteTask={deleteTask}
+                deleteEndedTasks={deleteEndedTasks}
                 exportJobTokens={exportJobTokens}
                 selectJob={loadJob}
                 busy={busy}

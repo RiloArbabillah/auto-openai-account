@@ -47,6 +47,7 @@ export function ProxyPoolPage({
     persist([]);
   }
   const failedProxies = settingsDraft.proxies.filter((proxy) => results[proxy] && !results[proxy].ok);
+  const untestedProxies = settingsDraft.proxies.filter((proxy) => !results[proxy]);
   function clearFailed() {
     if (!failedProxies.length) return;
     if (!window.confirm(`Delete ${failedProxies.length} failed proxies?`)) {
@@ -122,6 +123,62 @@ export function ProxyPoolPage({
       }),
     );
   }
+  async function testUntested() {
+    const ps = untestedProxies.filter(Boolean);
+    if (!ps.length) return;
+    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
+    await Promise.all(
+      ps.map(async (proxy) => {
+        try {
+          const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
+            method: "POST",
+            body: JSON.stringify({ proxy }),
+          });
+          setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
+        } catch (error) {
+          setResults((prev) => ({
+            ...prev,
+            [proxy]: {
+              proxy,
+              ok: false,
+              latency_ms: 0,
+              error: error instanceof Error ? error.message : "Test failed",
+            },
+          }));
+        } finally {
+          setTesting((prev) => prev.filter((item) => item !== proxy));
+        }
+      }),
+    );
+  }
+  async function testFailed() {
+    const ps = failedProxies.filter(Boolean);
+    if (!ps.length) return;
+    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
+    await Promise.all(
+      ps.map(async (proxy) => {
+        try {
+          const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
+            method: "POST",
+            body: JSON.stringify({ proxy }),
+          });
+          setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
+        } catch (error) {
+          setResults((prev) => ({
+            ...prev,
+            [proxy]: {
+              proxy,
+              ok: false,
+              latency_ms: 0,
+              error: error instanceof Error ? error.message : "Test failed",
+            },
+          }));
+        } finally {
+          setTesting((prev) => prev.filter((item) => item !== proxy));
+        }
+      }),
+    );
+  }
   const hasTesting = testing.length > 0;
   return (
     <>
@@ -149,6 +206,20 @@ export function ProxyPoolPage({
               className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-50"
             >
               {`Delete Failed (${failedProxies.length})`}
+            </button>
+            <button
+              onClick={testFailed}
+              disabled={hasTesting || !failedProxies.length}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {hasTesting ? "Testing..." : `Test Failed (${failedProxies.length})`}
+            </button>
+            <button
+              onClick={testUntested}
+              disabled={hasTesting || !untestedProxies.length}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {hasTesting ? "Testing..." : `Test Untested (${untestedProxies.length})`}
             </button>
             <button
               onClick={testAll}

@@ -94,6 +94,20 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 	for _, candidate := range candidates {
 		results = append(results, proxypool.Test(r.Context(), candidate, timeout))
 	}
+	persisted := make([]domain.ProxyTestResult, 0, len(results))
+	for _, result := range results {
+		persisted = append(persisted, domain.ProxyTestResult{
+			Proxy:     result.Proxy,
+			OK:        result.OK,
+			IP:        result.IP,
+			LatencyMS: result.LatencyMS,
+			Error:     result.Error,
+		})
+	}
+	if err := s.store.SaveProxyTestResults(persisted); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": results})
 }
 

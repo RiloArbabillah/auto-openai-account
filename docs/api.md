@@ -26,6 +26,7 @@ Unsupported methods return `405 Method Not Allowed`. Missing resources generally
 {
   "proxy_mode": "random",
   "proxies": [],
+  "proxy_test_results": {},
   "password_mode": "random",
   "fixed_password": "Mima1234567890.",
   "register_concurrency": 1,

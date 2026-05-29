@@ -125,6 +125,25 @@ func (s *Store) SaveSettings(settings domain.Settings) error {
 	return tx.Commit()
 }
 
+func (s *Store) SaveProxyTestResults(results []domain.ProxyTestResult) error {
+	settings, err := s.LoadSettings()
+	if err != nil {
+		return err
+	}
+	if settings.ProxyTestResults == nil {
+		settings.ProxyTestResults = map[string]domain.ProxyTestResult{}
+	}
+	for _, result := range results {
+		proxy := clean(result.Proxy)
+		if proxy == "" {
+			continue
+		}
+		result.Proxy = proxy
+		settings.ProxyTestResults[proxy] = result
+	}
+	return s.SaveSettings(settings)
+}
+
 func (s *Store) ImportMailboxes(items []domain.Mailbox) (int, int, []string, error) {
 	tx, err := s.db.Begin()
 	if err != nil {

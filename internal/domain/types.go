@@ -30,19 +30,28 @@ type SMSConfig struct {
 	MaxPrice  float64 `json:"max_price"`
 }
 
+type ProxyTestResult struct {
+	Proxy     string `json:"proxy"`
+	OK        bool   `json:"ok"`
+	IP        string `json:"ip,omitempty"`
+	LatencyMS int64  `json:"latency_ms"`
+	Error     string `json:"error,omitempty"`
+}
+
 type Settings struct {
-	ProxyMode              string      `json:"proxy_mode"`
-	Proxies                []string    `json:"proxies"`
-	PasswordMode           string      `json:"password_mode"`
-	FixedPassword          string      `json:"fixed_password"`
-	RegisterConcurrency    int         `json:"register_concurrency"`
-	OTPTimeoutSeconds      int         `json:"otp_timeout_seconds"`
-	OTPPollIntervalSeconds int         `json:"otp_poll_interval_seconds"`
-	IMAPHost               string      `json:"imap_host"`
-	IMAPPort               int         `json:"imap_port"`
-	IMAPAuthMode           string      `json:"imap_auth_mode"`
-	Listen                 string      `json:"listen"`
-	SMSConfigs             []SMSConfig `json:"sms_configs"`
+	ProxyMode              string                     `json:"proxy_mode"`
+	Proxies                []string                   `json:"proxies"`
+	ProxyTestResults       map[string]ProxyTestResult `json:"proxy_test_results"`
+	PasswordMode           string                     `json:"password_mode"`
+	FixedPassword          string                     `json:"fixed_password"`
+	RegisterConcurrency    int                        `json:"register_concurrency"`
+	OTPTimeoutSeconds      int                        `json:"otp_timeout_seconds"`
+	OTPPollIntervalSeconds int                        `json:"otp_poll_interval_seconds"`
+	IMAPHost               string                     `json:"imap_host"`
+	IMAPPort               int                        `json:"imap_port"`
+	IMAPAuthMode           string                     `json:"imap_auth_mode"`
+	Listen                 string                     `json:"listen"`
+	SMSConfigs             []SMSConfig                `json:"sms_configs"`
 }
 
 type Mailbox struct {
@@ -136,6 +145,9 @@ func DefaultSettings() Settings {
 func NormalizeSettings(s Settings) Settings {
 	if s.Proxies == nil {
 		s.Proxies = []string{}
+	}
+	if s.ProxyTestResults == nil {
+		s.ProxyTestResults = map[string]ProxyTestResult{}
 	}
 	if s.SMSConfigs == nil {
 		s.SMSConfigs = []SMSConfig{}

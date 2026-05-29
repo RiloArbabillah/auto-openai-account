@@ -17,6 +17,10 @@ export function normalizeSettingsPayload(settings: SettingsPayload): SettingsPay
   return {
     ...settings,
     proxies: Array.isArray(settings.proxies) ? settings.proxies : [],
+    proxy_test_results:
+      settings.proxy_test_results && typeof settings.proxy_test_results === "object"
+        ? settings.proxy_test_results
+        : {},
     sms_configs: Array.isArray(settings.sms_configs)
       ? settings.sms_configs.map((config) => ({
           name: config.name || "",

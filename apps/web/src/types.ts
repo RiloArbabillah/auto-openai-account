@@ -98,6 +98,7 @@ export type SMSCatalog = {
 export type SettingsPayload = {
   proxy_mode: string;
   proxies: string[];
+  proxy_test_results: Record<string, ProxyTestResult>;
   register_concurrency: number;
   password_mode: string;
   fixed_password: string;

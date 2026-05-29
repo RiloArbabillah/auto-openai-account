@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PlugZap } from "lucide-react";
 import { api } from "../../lib/api";
 import { isValidProxyURL } from "../../lib/format";
@@ -24,8 +24,18 @@ export function ProxyPoolPage({
   const [testing, setTesting] = useState<string[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState("");
+
+  useEffect(() => {
+    setResults(settingsDraft.proxy_test_results || {});
+  }, [settingsDraft.proxy_test_results]);
+
   const persist = (proxies: string[]) => {
+    const allowed = new Set(proxies);
+    const nextResults = Object.fromEntries(
+      Object.entries(results).filter(([proxy]) => allowed.has(proxy)),
+    );
     const next = { ...settingsDraft, proxies };
+    next.proxy_test_results = nextResults;
     setSettingsDraft(next);
     saveSettings(next);
   };
@@ -35,6 +45,22 @@ export function ProxyPoolPage({
       return;
     }
     persist([]);
+  }
+  const failedProxies = settingsDraft.proxies.filter((proxy) => results[proxy] && !results[proxy].ok);
+  function clearFailed() {
+    if (!failedProxies.length) return;
+    if (!window.confirm(`Delete ${failedProxies.length} failed proxies?`)) {
+      return;
+    }
+    const failedSet = new Set(failedProxies);
+    persist(settingsDraft.proxies.filter((proxy) => !failedSet.has(proxy)));
+    setResults((prev) => {
+      const next = { ...prev };
+      for (const proxy of failedProxies) {
+        delete next[proxy];
+      }
+      return next;
+    });
   }
   const remove = (i: number) =>
     persist(settingsDraft.proxies.filter((_, idx) => idx !== i));
@@ -116,6 +142,13 @@ export function ProxyPoolPage({
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 disabled:opacity-50"
             >
               Clear All
+            </button>
+            <button
+              onClick={clearFailed}
+              disabled={!failedProxies.length}
+              className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-700 disabled:opacity-50"
+            >
+              {`Delete Failed (${failedProxies.length})`}
             </button>
             <button
               onClick={testAll}

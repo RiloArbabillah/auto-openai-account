@@ -141,7 +141,12 @@ func (s *Store) SaveProxyTestResults(results []domain.ProxyTestResult) error {
 		result.Proxy = proxy
 		settings.ProxyTestResults[proxy] = result
 	}
-	return s.SaveSettings(settings)
+	encoded, err := json.Marshal(settings.ProxyTestResults)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, "proxy_test_results", string(encoded), now())
+	return err
 }
 
 func (s *Store) ImportMailboxes(items []domain.Mailbox) (int, int, []string, error) {

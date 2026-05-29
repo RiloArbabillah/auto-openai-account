@@ -187,15 +187,15 @@ func NormalizeSettings(s Settings) Settings {
 func MailboxStatusText(status string) string {
 	switch status {
 	case MailboxStatusNew:
-		return "新导入"
+		return "New"
 	case MailboxStatusRegistering:
-		return "注册中"
+		return "Registering"
 	case MailboxStatusRegistered:
-		return "已注册"
+		return "Registered"
 	case MailboxStatusLogining:
-		return "登录中"
+		return "Logging In"
 	case MailboxStatusAbnormal:
-		return "异常"
+		return "Abnormal"
 	default:
 		return status
 	}

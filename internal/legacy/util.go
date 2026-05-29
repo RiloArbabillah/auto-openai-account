@@ -221,27 +221,27 @@ func ExplainError(message string) string {
 	var reason string
 	switch {
 	case strings.Contains(lower, "platform_authorize_entered_login_flow") || strings.Contains(lower, "/log-in/password"):
-		reason = "注册失败：OpenAI 返回了登录密码页面，而不是新账号创建页面。通常表示该邮箱已经注册过、存在半成品账号，或被上游识别为已有账号/关联登录方式。建议换一个从未注册过的邮箱，或改走登录换 token 流程。"
+		reason = "Registration failed: OpenAI returned the login password page instead of the new account creation page. This usually means the mailbox was already registered, is tied to a partial account, or was routed to an existing login method. Try a mailbox that has never been registered, or switch to the token refresh login flow."
 	case strings.Contains(lower, "otp timeout"):
-		reason = "验证码获取超时：在设定时间内没有从邮箱 INBOX 读取到符合条件的 6 位验证码。请检查 IMAP 配置、邮箱 access_token/密码、验证码邮件是否到达、是否进了垃圾箱，或适当增加等待时间。"
+		reason = "Verification code timed out: no valid 6-digit code was read from the mailbox INBOX within the configured time. Check the IMAP settings, mailbox access_token/password, whether the verification email arrived, whether it landed in spam, or increase the wait time."
 	case strings.Contains(lower, "imap command failed") || strings.Contains(lower, "authenticate xoauth2") || strings.Contains(lower, "imap xoauth2 token is empty"):
-		reason = "邮箱登录失败：IMAP 认证没有通过。请检查邮箱 access_token 是否有效，或将 IMAP 认证模式改为 password/auto 并确认邮箱密码可用。"
+		reason = "Mailbox login failed: IMAP authentication did not succeed. Check whether the mailbox access_token is valid, or switch IMAP authentication mode to password/auto and confirm the mailbox password works."
 	case strings.Contains(lower, "send_otp_http_"):
-		reason = "发送邮箱验证码失败：上游没有接受发送验证码请求，可能是网络、代理、风控或当前注册会话异常。"
+		reason = "Failed to send the email verification code: the upstream service rejected the request. This may be caused by network issues, proxy issues, anti-abuse checks, or a broken registration session."
 	case strings.Contains(lower, "validate_otp_http_"):
-		reason = "验证码校验失败：读取到的验证码未被上游接受，可能验证码已过期、读取到了旧验证码，或当前注册会话已失效。"
+		reason = "Verification code validation failed: the code read from email was not accepted upstream. The code may have expired, may be stale, or the current registration session may already be invalid."
 	case strings.Contains(lower, "user_register_http_"):
-		reason = "提交注册密码失败：上游拒绝创建账号，可能是邮箱域名、代理环境、密码规则或风控导致。"
+		reason = "Failed to submit the registration password: the upstream service rejected account creation. The mailbox domain, proxy environment, password policy, or anti-abuse checks may be the cause."
 	case strings.Contains(lower, "create_account_http_"):
-		reason = "创建账号资料失败：验证码校验后创建账号阶段被上游拒绝，可能是风控、代理环境或邮箱域名限制导致。"
+		reason = "Failed to create the account profile: the upstream service rejected the post-verification account creation step. This may be caused by anti-abuse checks, proxy environment, or mailbox domain restrictions."
 	case strings.Contains(lower, "password_verify_http_"):
-		reason = "登录密码校验失败：账号密码没有通过上游校验，请确认保存的注册密码是否正确。"
+		reason = "Login password verification failed: the account password did not pass upstream validation. Confirm the saved registration password is correct."
 	case strings.Contains(lower, "oauth_token_http_") || strings.Contains(lower, "token exchange"):
-		reason = "换取 token 失败：上游授权成功后没有正常返回 token，可能是授权回调、代理或会话状态异常。"
+		reason = "Token exchange failed: upstream authorization succeeded but no token was returned normally. This may be caused by callback issues, proxy issues, or a broken session state."
 	default:
-		reason = "操作失败：程序收到上游或本地流程错误，暂未匹配到更具体的中文原因。请结合原始错误排查。"
+		reason = "Operation failed: the program received an upstream or local process error, but no more specific explanation has been identified yet. Check the original error for troubleshooting."
 	}
-	return reason + "\n原始错误：" + message
+	return reason + "\nOriginal error: " + message
 }
 
 func AnonymizeToken(token any) string {

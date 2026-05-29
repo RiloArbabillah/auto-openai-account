@@ -25,7 +25,7 @@ type RegisterResult struct {
 
 func RegisterOne(ctx context.Context, input RegisterInput) (*RegisterResult, error) {
 	email := Clean(input.Mailbox.Email)
-	logStep(email, "注册流程开始")
+	logStep(email, "Registration flow started")
 	if email == "" {
 		return nil, fmt.Errorf("email is required")
 	}
@@ -39,19 +39,19 @@ func RegisterOne(ctx context.Context, input RegisterInput) (*RegisterResult, err
 	}
 	defer w.close()
 
-	logStep(email, "步骤 1/8 platform authorize")
+	logStep(email, "Step 1/8 platform authorize")
 	if err := w.platformAuthorize(ctx, email); err != nil {
 		return nil, err
 	}
-	logStep(email, "步骤 2/8 提交注册密码")
+	logStep(email, "Step 2/8 submit registration password")
 	if err := w.registerUser(ctx, email, password); err != nil {
 		return nil, err
 	}
-	logStep(email, "步骤 3/8 请求发送邮箱验证码")
+	logStep(email, "Step 3/8 request email verification code")
 	if err := w.sendOTP(ctx); err != nil {
 		return nil, err
 	}
-	logStep(email, "步骤 4/8 等待并读取邮箱验证码")
+	logStep(email, "Step 4/8 wait for and read email verification code")
 	code, err := input.OTPFetcher(ctx)
 	if err != nil {
 		return nil, err
@@ -59,24 +59,24 @@ func RegisterOne(ctx context.Context, input RegisterInput) (*RegisterResult, err
 	if code == "" {
 		return nil, fmt.Errorf("verification code is empty")
 	}
-	logStep(email, "步骤 5/8 已获取验证码 code=%s，提交校验", code)
+	logStep(email, "Step 5/8 verification code received code=%s, submitting", code)
 	if err := w.validateOTP(ctx, code); err != nil {
 		return nil, err
 	}
 
 	name := randomName()
 	birthdate := randomBirthdate()
-	logStep(email, "步骤 6/8 创建账号资料 name=%s birthdate=%s", name, birthdate)
+	logStep(email, "Step 6/8 create account profile name=%s birthdate=%s", name, birthdate)
 	if err := w.createAccount(ctx, name, birthdate); err != nil {
 		return nil, err
 	}
 
 	result := &RegisterResult{Email: email, Password: password, Name: name, Birthdate: birthdate}
 	if input.SkipTokenLogin {
-		logStep(email, "注册流程完成，跳过 token 登录")
+		logStep(email, "Registration flow complete, skipping token login")
 		return result, nil
 	}
-	logStep(email, "步骤 7/8 登录并换取 token")
+	logStep(email, "Step 7/8 log in and exchange token")
 	tokens, err := w.loginAndExchangeTokens(ctx, email, password)
 	if err != nil {
 		return nil, err
@@ -85,13 +85,13 @@ func RegisterOne(ctx context.Context, input RegisterInput) (*RegisterResult, err
 	tokens["password"] = password
 	tokens["created_at"] = time.Now().UTC().Format(time.RFC3339Nano)
 	result.TokenPayload = tokens
-	logStep(email, "步骤 8/8 注册流程完成，token 已获取")
+	logStep(email, "Step 8/8 registration complete, token acquired")
 	return result, nil
 }
 
 func LoginOne(ctx context.Context, mailbox Mailbox, settings Settings, otpFetcher func(context.Context) (string, error)) (map[string]any, error) {
 	email := Clean(mailbox.Email)
-	logStep(email, "登录换 token 流程开始")
+	logStep(email, "Token refresh login flow started")
 	password := firstNonEmpty(Clean(mailbox.RegisterPassword), Clean(mailbox.Password))
 	if email == "" || password == "" {
 		return nil, fmt.Errorf("email and password are required")
@@ -108,7 +108,7 @@ func LoginOne(ctx context.Context, mailbox Mailbox, settings Settings, otpFetche
 	tokens["email"] = email
 	tokens["password"] = password
 	tokens["created_at"] = time.Now().UTC().Format(time.RFC3339Nano)
-	logStep(email, "登录换 token 流程完成")
+	logStep(email, "Token refresh login flow completed")
 	return tokens, nil
 }
 

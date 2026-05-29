@@ -77,7 +77,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 
 	codeVerifier, codeChallenge := generatePKCE()
 	state := randomToken()
-	progress("codex_authorize", 1, 8, "正在创建 Codex OAuth 授权会话")
+	progress("codex_authorize", 1, 8, "Creating Codex OAuth authorization session")
 	status, payload, err := w.request(ctx, http.MethodGet, codexAuthorizeURL(state, codeChallenge), nil, w.navigateHeaders(authBase+"/"), true)
 	if err != nil {
 		return nil, fmt.Errorf("codex_authorize_request_failed: %w", err)
@@ -86,7 +86,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 		return nil, fmt.Errorf("codex_authorize_http_%d%s", status, responseDetail(payload))
 	}
 
-	progress("submit_email", 2, 8, "正在提交邮箱并确认登录方式")
+	progress("submit_email", 2, 8, "Submitting email and confirming login method")
 	status, payload, err = w.submitLoginEmail(ctx, email)
 	if err != nil {
 		return nil, fmt.Errorf("submit_email_failed: %w", err)
@@ -96,12 +96,12 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 	}
 
 	continueURL, pageType := pageState(payload)
-	progress("submit_email", 2, 8, fmt.Sprintf("邮箱提交成功，下一步 %s", firstNonEmpty(pageType, continueURL)))
+	progress("submit_email", 2, 8, fmt.Sprintf("Email submitted successfully, next step %s", firstNonEmpty(pageType, continueURL)))
 
 	var phoneNumber string
 	if isPasswordStep(continueURL, pageType) {
 		for attempt := 1; attempt <= passwordVerifyRetries; attempt++ {
-			progress("password_login", 3, 8, "正在提交 OpenAI 密码")
+			progress("password_login", 3, 8, "Submitting OpenAI password")
 			status, payload, err = w.codexVerifyPassword(ctx, password)
 			if err != nil {
 				return nil, fmt.Errorf("password_verify_failed: %w", err)
@@ -112,7 +112,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 			if status != http.StatusUnauthorized || attempt == passwordVerifyRetries {
 				return nil, fmt.Errorf("password_verify_http_%d%s", status, responseDetail(payload))
 			}
-			progress("password_login", 3, 8, fmt.Sprintf("密码校验暂未通过，等待 %s 后重试（%d/%d）", passwordVerifyRetryDelay, attempt+1, passwordVerifyRetries))
+			progress("password_login", 3, 8, fmt.Sprintf("Password verification did not pass yet, retrying after %s (%d/%d)", passwordVerifyRetryDelay, attempt+1, passwordVerifyRetries))
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -120,7 +120,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 			}
 		}
 		continueURL, pageType = pageState(payload)
-		progress("password_login", 3, 8, fmt.Sprintf("密码校验通过，下一步 %s", firstNonEmpty(pageType, continueURL)))
+		progress("password_login", 3, 8, fmt.Sprintf("Password verification passed, next step %s", firstNonEmpty(pageType, continueURL)))
 	}
 
 	if isAddPhoneStep(continueURL, pageType) {
@@ -132,7 +132,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 		phoneNumber = boundPhone
 	}
 
-	progress("exchange_token", 8, 8, "正在选择 workspace 并换取 Codex token")
+	progress("exchange_token", 8, 8, "Selecting workspace and exchanging Codex token")
 	tokenPayload, err := w.exchangeCodexTokensFromContinueURL(ctx, continueURL, codeVerifier)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ func CodexLogin(ctx context.Context, input CodexLoginInput) (*CodexLoginResult, 
 	if phoneNumber != "" {
 		tokenPayload["phone_number"] = phoneNumber
 	}
-	progress("codex_complete", 8, 8, "Codex 授权登录流程完成")
+	progress("codex_complete", 8, 8, "Codex auth login flow completed")
 	return &CodexLoginResult{TokenPayload: tokenPayload, PhoneNumber: phoneNumber}, nil
 }
 
@@ -193,73 +193,73 @@ func (w *worker) codexBindPhone(ctx context.Context, provider CodexSMSProvider, 
 	}
 	var lastErr error
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		progress("add_phone", 4, 8, fmt.Sprintf("正在获取手机号，第 %d/%d 次", attempt, maxAttempts))
+		progress("add_phone", 4, 8, fmt.Sprintf("Acquiring phone number, attempt %d/%d", attempt, maxAttempts))
 		activation, err := provider.GetNumber(ctx)
 		if err != nil {
 			lastErr = err
-			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("获取手机号失败：%v", err)))
+			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("Failed to acquire phone number: %v", err)))
 			continue
 		}
 		if activation == nil || Clean(activation.ID) == "" || Clean(activation.PhoneNumber) == "" {
 			lastErr = fmt.Errorf("sms provider returned empty activation")
-			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, "短信平台返回空手机号或空激活 ID"))
+			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, "SMS provider returned an empty phone number or activation ID"))
 			continue
 		}
 		phoneNumber := normalizeCodexPhoneNumber(activation.PhoneNumber, activation.CountryPhoneCode)
 		if phoneNumber == "" {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = fmt.Errorf("sms provider returned invalid phone number")
-			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("短信平台返回的手机号格式无效：%s", activation.PhoneNumber)))
+			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("SMS provider returned an invalid phone number format: %s", activation.PhoneNumber)))
 			continue
 		}
 
-		progress("add_phone", 4, 8, fmt.Sprintf("已获取手机号 %s，正在提交给 OpenAI", phoneNumber))
+		progress("add_phone", 4, 8, fmt.Sprintf("Phone number %s acquired, submitting to OpenAI", phoneNumber))
 		status, payload, err := w.codexSubmitPhone(ctx, phoneNumber)
 		if err != nil {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = fmt.Errorf("submit_phone_failed: %w", err)
-			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("提交手机号请求失败：%v", err)))
+			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("Submit phone request failed: %v", err)))
 			continue
 		}
 		if status != http.StatusOK {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = fmt.Errorf("submit_phone_http_%d%s", status, responseDetail(payload))
-			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, "手机号被 OpenAI 拒绝："+phoneSubmitFailureReason(status, payload)))
+			progress("add_phone", 4, 8, phoneRetryMessage(attempt, maxAttempts, "Phone number rejected by OpenAI: "+phoneSubmitFailureReason(status, payload)))
 			continue
 		}
 
-		progress("phone_verification", 5, 8, "手机号已提交，正在等待短信验证码")
+		progress("phone_verification", 5, 8, "Phone number submitted, waiting for SMS verification code")
 		code, err := provider.PollCode(ctx, activation.ID)
 		if err != nil {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = err
-			progress("phone_verification", 5, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("短信验证码获取失败：%v", err)))
+			progress("phone_verification", 5, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("Failed to fetch SMS verification code: %v", err)))
 			continue
 		}
 		if Clean(code) == "" {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = fmt.Errorf("sms code is empty")
-			progress("phone_verification", 5, 8, phoneRetryMessage(attempt, maxAttempts, "短信平台返回空验证码"))
+			progress("phone_verification", 5, 8, phoneRetryMessage(attempt, maxAttempts, "SMS provider returned an empty verification code"))
 			continue
 		}
 
-		progress("phone_verification", 6, 8, "已获取短信验证码，正在提交校验")
+		progress("phone_verification", 6, 8, "SMS verification code received, submitting for validation")
 		status, payload, err = w.codexSubmitPhoneOTP(ctx, Clean(code))
 		if err != nil {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = err
-			progress("phone_verification", 6, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("提交短信验证码请求失败：%v", err)))
+			progress("phone_verification", 6, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("Submit SMS verification code request failed: %v", err)))
 			continue
 		}
 		if status != http.StatusOK {
 			_ = provider.Cancel(ctx, activation.ID)
 			lastErr = fmt.Errorf("phone_otp_http_%d%s", status, responseDetail(payload))
-			progress("phone_verification", 6, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("短信验证码被 OpenAI 拒绝：HTTP %d%s", status, responseDetail(payload))))
+			progress("phone_verification", 6, 8, phoneRetryMessage(attempt, maxAttempts, fmt.Sprintf("SMS verification code rejected by OpenAI: HTTP %d%s", status, responseDetail(payload))))
 			continue
 		}
 		_ = provider.Complete(ctx, activation.ID)
 		nextURL, pageType := pageState(payload)
-		progress("phone_verification", 7, 8, "手机号验证成功")
+		progress("phone_verification", 7, 8, "Phone number verified successfully")
 		return nextURL, pageType, phoneNumber, nil
 	}
 	if lastErr == nil {
@@ -276,9 +276,9 @@ func (w *worker) codexSubmitPhone(ctx context.Context, phoneNumber string) (int,
 
 func phoneRetryMessage(attempt, maxAttempts int, reason string) string {
 	if attempt < maxAttempts {
-		return fmt.Sprintf("%s。已取消当前手机号，准备更换手机号（下一次 %d/%d）", reason, attempt+1, maxAttempts)
+		return fmt.Sprintf("%s. Cancelled the current phone number and preparing to try another one (%d/%d next)", reason, attempt+1, maxAttempts)
 	}
-	return fmt.Sprintf("%s。已取消当前手机号，已达到最大手机号尝试次数（%d/%d）", reason, attempt, maxAttempts)
+	return fmt.Sprintf("%s. Cancelled the current phone number and reached the maximum phone attempts (%d/%d)", reason, attempt, maxAttempts)
 }
 
 func phoneSubmitFailureReason(status int, payload map[string]any) string {
@@ -287,11 +287,11 @@ func phoneSubmitFailureReason(status int, payload map[string]any) string {
 	message := Clean(errPayload["message"])
 	switch {
 	case code != "" && message != "":
-		return fmt.Sprintf("HTTP %d，%s：%s", status, code, message)
+		return fmt.Sprintf("HTTP %d, %s: %s", status, code, message)
 	case code != "":
-		return fmt.Sprintf("HTTP %d，%s", status, code)
+		return fmt.Sprintf("HTTP %d, %s", status, code)
 	case message != "":
-		return fmt.Sprintf("HTTP %d，%s", status, message)
+		return fmt.Sprintf("HTTP %d, %s", status, message)
 	default:
 		return fmt.Sprintf("HTTP %d%s", status, responseDetail(payload))
 	}

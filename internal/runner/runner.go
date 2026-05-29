@@ -141,7 +141,7 @@ func (r *Runner) Stop(jobID int64) error {
 		r.cancel()
 	}
 	r.mu.Unlock()
-	r.log(domain.RuntimeLog{JobID: jobID, Level: "info", Step: "stopped", Message: "任务已手动结束"})
+	r.log(domain.RuntimeLog{JobID: jobID, Level: "info", Step: "stopped", Message: "Job stopped manually"})
 	return r.store.StopJob(jobID)
 }
 
@@ -273,7 +273,7 @@ func (r *Runner) runRegisterOne(ctx context.Context, jobID int64, mailbox domain
 	result, err := legacy.RegisterOne(ctx, legacy.RegisterInput{Mailbox: legacyMailbox, Settings: legacySettings, RegisterPass: registerPass, OTPFetcher: provider.Fetch, SkipTokenLogin: skipTokenLogin})
 	duration := time.Since(started)
 	if ctx.Err() != nil {
-		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "手动结束任务", duration)
+		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
 		_ = r.store.RecalculateJob(jobID, domain.JobStatusStopped)
 		return
 	}
@@ -294,9 +294,9 @@ func (r *Runner) runRegisterOne(ctx context.Context, jobID int64, mailbox domain
 	}
 	_ = r.store.UpdateJobItem(jobID, mailbox.ID, "success", "", duration)
 	_ = r.store.RecalculateJob(jobID, "")
-	message := "注册流程完成"
+	message := "Registration flow completed"
 	if flow == domain.JobTypeRegisterLogin {
-		message = "注册并普通登录流程完成"
+		message = "Registration and standard login flow completed"
 	}
 	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "complete", StepIndex: 8, StepTotal: 8, Message: message})
 }
@@ -320,7 +320,7 @@ func (r *Runner) LoginMailbox(mailbox domain.Mailbox, settings domain.Settings) 
 			return
 		}
 		_ = r.store.MarkMailboxLoginResult(mailbox.ID, legacy.CompactTokenJSON(tokens), "")
-		r.log(domain.RuntimeLog{MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "login_complete", Message: "登录换 token 流程完成"})
+		r.log(domain.RuntimeLog{MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "login_complete", Message: "Token refresh login flow completed"})
 	}()
 	return nil
 }
@@ -338,7 +338,7 @@ func (r *Runner) runLoginOne(ctx context.Context, jobID int64, mailbox domain.Ma
 	tokens, err := legacy.LoginOne(ctx, legacyMailbox, legacySettings, provider.Fetch)
 	duration := time.Since(started)
 	if ctx.Err() != nil {
-		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "手动结束任务", duration)
+		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
 		_ = r.store.RecalculateJob(jobID, domain.JobStatusStopped)
 		return
 	}
@@ -353,7 +353,7 @@ func (r *Runner) runLoginOne(ctx context.Context, jobID int64, mailbox domain.Ma
 	_ = r.store.MarkMailboxLoginResult(mailbox.ID, legacy.CompactTokenJSON(tokens), "")
 	_ = r.store.UpdateJobItem(jobID, mailbox.ID, "success", "", duration)
 	_ = r.store.RecalculateJob(jobID, "")
-	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "login_complete", Message: "登录换 token 流程完成"})
+	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "login_complete", Message: "Token refresh login flow completed"})
 }
 
 func (r *Runner) runCodexLoginOne(ctx context.Context, jobID int64, mailbox domain.Mailbox, settings domain.Settings, smsConfigName string) {
@@ -363,14 +363,14 @@ func (r *Runner) runCodexLoginOne(ctx context.Context, jobID int64, mailbox doma
 	_ = r.store.MarkMailboxLogining(mailbox.ID)
 	r.setActive(mailbox.Email, activeLogContext{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Proxy: proxy})
 	defer r.clearActive(mailbox.Email)
-	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "codex_start", StepIndex: 1, StepTotal: 8, Message: "Codex 授权登录流程开始"})
+	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "codex_start", StepIndex: 1, StepTotal: 8, Message: "Codex auth login flow started"})
 	r.runCodexLoginAfterStarted(ctx, jobID, mailbox, settings, proxy, smsConfigName, started, "codex")
 }
 
 func (r *Runner) runCodexLoginAfterStarted(ctx context.Context, jobID int64, mailbox domain.Mailbox, settings domain.Settings, proxy string, smsConfigName string, started time.Time, prefix string) {
 	duration := time.Since(started)
 	if ctx.Err() != nil {
-		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "手动结束任务", duration)
+		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
 		_ = r.store.RecalculateJob(jobID, domain.JobStatusStopped)
 		return
 	}
@@ -387,7 +387,7 @@ func (r *Runner) runCodexLoginAfterStarted(ctx context.Context, jobID int64, mai
 		MaxPrice:  smsConfig.MaxPrice,
 	})
 	if err != nil {
-		r.failCodexJobItem(jobID, mailbox, prefix, fmt.Sprintf("短信平台初始化失败: %v", err), duration)
+		r.failCodexJobItem(jobID, mailbox, prefix, fmt.Sprintf("SMS provider initialization failed: %v", err), duration)
 		return
 	}
 	defer provider.Close()
@@ -419,7 +419,7 @@ func (r *Runner) runCodexLoginAfterStarted(ctx context.Context, jobID int64, mai
 	<-progressDone
 	duration = time.Since(started)
 	if ctx.Err() != nil {
-		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "手动结束任务", duration)
+		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
 		_ = r.store.RecalculateJob(jobID, domain.JobStatusStopped)
 		return
 	}
@@ -433,7 +433,7 @@ func (r *Runner) runCodexLoginAfterStarted(ctx context.Context, jobID int64, mai
 	_ = r.store.MarkMailboxLoginResult(mailbox.ID, result.TokenJSON, "")
 	_ = r.store.UpdateJobItem(jobID, mailbox.ID, "success", "", duration)
 	_ = r.store.RecalculateJob(jobID, "")
-	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "codex_complete", StepIndex: 8, StepTotal: 8, Message: "Codex 授权登录流程完成"})
+	r.log(domain.RuntimeLog{JobID: jobID, MailboxID: mailbox.ID, Email: mailbox.Email, Level: "info", Step: "codex_complete", StepIndex: 8, StepTotal: 8, Message: "Codex auth login flow completed"})
 }
 
 func generateRandomPassword() string {
@@ -586,84 +586,84 @@ func (r *Runner) handleLegacyLog(email, message string) {
 func uiLogMessage(message string) string {
 	message = strings.TrimSpace(message)
 	switch {
-	case strings.HasPrefix(message, "步骤 1/8"):
-		return "正在初始化注册会话"
-	case strings.HasPrefix(message, "步骤 2/8"):
-		return "正在提交注册密码"
-	case strings.HasPrefix(message, "步骤 3/8"):
-		return "正在请求发送邮箱验证码"
-	case strings.HasPrefix(message, "步骤 4/8"):
-		return "正在等待并读取邮箱验证码"
-	case strings.HasPrefix(message, "步骤 5/8"):
-		return "已读取验证码，正在提交校验"
-	case strings.HasPrefix(message, "步骤 6/8"):
-		return "验证码通过，正在创建账号资料"
-	case strings.HasPrefix(message, "步骤 7/8"):
-		return "账号已创建，正在登录并换取 token"
-	case strings.HasPrefix(message, "步骤 8/8"):
-		return "注册完成，token 已获取"
-	case strings.HasPrefix(message, "注册流程开始"):
-		return "注册流程开始"
-	case strings.HasPrefix(message, "注册流程完成"):
-		return "注册流程完成"
-	case strings.HasPrefix(message, "登录换 token 流程开始"):
-		return "登录换 token 流程开始"
-	case strings.Contains(message, "提交邮箱请求失败"):
-		return "提交邮箱失败，正在停止当前流程"
-	case strings.Contains(message, "提交邮箱") || strings.Contains(message, "重新提交邮箱"):
-		return "正在提交邮箱并确认登录方式"
-	case strings.Contains(message, "发送登录验证码失败"):
-		return "发送登录验证码失败，正在尝试密码校验"
-	case strings.Contains(message, "发送登录验证码"):
-		return "正在发送登录验证码"
-	case strings.Contains(message, "已获取登录验证码"):
-		return "已读取登录验证码，正在提交校验"
-	case strings.Contains(message, "登录验证码校验失败"):
-		return "登录验证码校验失败，正在尝试密码校验"
-	case strings.Contains(message, "登录验证码校验通过"):
-		return "登录验证码校验通过"
-	case strings.Contains(message, "构建 password_verify"):
-		return "正在准备密码校验"
-	case strings.Contains(message, "提交密码校验"):
-		return "正在提交密码校验"
-	case strings.Contains(message, "密码校验请求失败"):
-		return "密码校验请求失败"
-	case strings.Contains(message, "密码校验通过"):
-		return "密码校验通过，正在完成授权"
-	case strings.Contains(message, "密码校验返回"):
-		return "已收到密码校验结果"
-	case strings.Contains(message, "开始轮询邮箱验证码"):
-		return "正在连接邮箱读取验证码"
-	case strings.Contains(message, "邮箱验证码轮询第"):
-		return "正在检查邮箱验证码"
-	case strings.Contains(message, "邮箱验证码获取成功"):
-		return "已从邮箱读取验证码"
-	case strings.Contains(message, "邮箱验证码轮询失败"):
-		return "本次读取邮箱验证码失败，稍后重试"
-	case strings.Contains(message, "本次未找到验证码"):
-		return "暂未找到验证码，等待后继续检查"
-	case strings.Contains(message, "邮箱验证码超时"):
-		return "读取邮箱验证码超时"
-	case strings.Contains(message, "连接 IMAP"):
-		return "正在连接邮箱服务器"
-	case strings.Contains(message, "IMAP 登录认证"):
-		return "正在认证邮箱"
-	case strings.Contains(message, "IMAP 选择 INBOX") || strings.Contains(message, "IMAP 搜索全部邮件"):
-		return "正在搜索收件箱邮件"
-	case strings.Contains(message, "INBOX 没有邮件"):
-		return "收件箱暂无邮件"
-	case strings.Contains(message, "准备检查最近") || strings.Contains(message, "读取邮件"):
-		return "正在检查最近邮件"
-	case strings.Contains(message, "跳过："):
-		return "已跳过一封不匹配的邮件"
-	case strings.Contains(message, "可见正文未匹配到"):
-		return "邮件中暂未匹配到验证码"
-	case strings.Contains(message, "可见正文匹配到"):
-		return "邮件中已匹配到验证码"
-	case strings.Contains(message, "access token 刷新成功"):
-		return "邮箱访问 token 已刷新"
-	case strings.HasPrefix(message, "登录换 token 流程完成"):
-		return "登录换 token 流程完成"
+	case strings.HasPrefix(message, "Step 1/8"):
+		return "Initializing registration session"
+	case strings.HasPrefix(message, "Step 2/8"):
+		return "Submitting registration password"
+	case strings.HasPrefix(message, "Step 3/8"):
+		return "Requesting email verification code"
+	case strings.HasPrefix(message, "Step 4/8"):
+		return "Waiting for and reading email verification code"
+	case strings.HasPrefix(message, "Step 5/8"):
+		return "Verification code received, validating it"
+	case strings.HasPrefix(message, "Step 6/8"):
+		return "Verification passed, creating account profile"
+	case strings.HasPrefix(message, "Step 7/8"):
+		return "Account created, logging in and exchanging token"
+	case strings.HasPrefix(message, "Step 8/8"):
+		return "Registration complete, token acquired"
+	case strings.HasPrefix(message, "Registration flow started"):
+		return "Registration flow started"
+	case strings.HasPrefix(message, "Registration flow complete") || strings.HasPrefix(message, "Registration flow completed"):
+		return "Registration flow completed"
+	case strings.HasPrefix(message, "Token refresh login flow started"):
+		return "Token refresh login flow started"
+	case strings.Contains(message, "submit email request failed"):
+		return "Email submission failed, stopping the current flow"
+	case strings.Contains(message, "submit email") || strings.Contains(message, "re-submit email"):
+		return "Submitting email and confirming the login method"
+	case strings.Contains(message, "send login verification code failed"):
+		return "Sending the login verification code failed, falling back to password verification"
+	case strings.Contains(message, "send login verification code"):
+		return "Sending login verification code"
+	case strings.Contains(message, "login verification code received"):
+		return "Login verification code received, submitting for validation"
+	case strings.Contains(message, "login verification code validation failed"):
+		return "Login verification code validation failed, falling back to password verification"
+	case strings.Contains(message, "login verification code validation passed"):
+		return "Login verification code validation passed"
+	case strings.Contains(message, "build password_verify"):
+		return "Preparing password verification"
+	case strings.Contains(message, "submit password verification"):
+		return "Submitting password verification"
+	case strings.Contains(message, "password verification request failed"):
+		return "Password verification request failed"
+	case strings.Contains(message, "password verification passed"):
+		return "Password verification passed, finishing authorization"
+	case strings.Contains(message, "password verification returned"):
+		return "Password verification response received"
+	case strings.Contains(message, "Start polling email verification code"):
+		return "Connecting to mailbox and reading verification code"
+	case strings.Contains(message, "Email verification code poll attempt"):
+		return "Checking mailbox verification code"
+	case strings.Contains(message, "Email verification code fetched successfully"):
+		return "Verification code read from mailbox"
+	case strings.Contains(message, "Email verification code poll failed"):
+		return "Reading mailbox verification code failed this round, retrying shortly"
+	case strings.Contains(message, "No verification code found this round"):
+		return "No verification code found yet, waiting before the next check"
+	case strings.Contains(message, "Email verification code timeout"):
+		return "Timed out while reading mailbox verification code"
+	case strings.Contains(message, "Connect IMAP"):
+		return "Connecting to mailbox server"
+	case strings.Contains(message, "IMAP authenticate"):
+		return "Authenticating mailbox"
+	case strings.Contains(message, "IMAP select INBOX") || strings.Contains(message, "IMAP search all mail"):
+		return "Searching inbox mail"
+	case strings.Contains(message, "INBOX has no mail"):
+		return "No messages in the inbox"
+	case strings.Contains(message, "Preparing to inspect the latest") || strings.Contains(message, "Read email"):
+		return "Inspecting recent messages"
+	case strings.Contains(message, "skipped:"):
+		return "Skipped a non-matching email"
+	case strings.Contains(message, "did not contain a visible 6-digit code"):
+		return "No verification code matched in the email body"
+	case strings.Contains(message, "matched a visible 6-digit code"):
+		return "Verification code matched in the email body"
+	case strings.Contains(message, "access token refreshed successfully"):
+		return "Mailbox access token refreshed"
+	case strings.HasPrefix(message, "Token refresh login flow completed"):
+		return "Token refresh login flow completed"
 	default:
 		return stripLogDetails(message)
 	}
@@ -672,7 +672,7 @@ func uiLogMessage(message string) string {
 func stripLogDetails(message string) string {
 	if idx := strings.Index(message, ": "); idx >= 0 && idx+2 < len(message) {
 		prefix := message[:idx]
-		if strings.Contains(prefix, "登录换 token") {
+		if strings.Contains(prefix, "Token refresh login") {
 			message = message[idx+2:]
 		}
 	}
@@ -697,7 +697,7 @@ func (r *Runner) clearActive(email string) {
 }
 
 func parseLegacyStep(message string) (int, int, string) {
-	if !strings.HasPrefix(message, "步骤 ") {
+	if !strings.HasPrefix(message, "Step ") {
 		return 0, 0, ""
 	}
 	fields := strings.Fields(message)

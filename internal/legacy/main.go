@@ -69,20 +69,20 @@ func runCLI() {
 	cfg := loadConfig()
 	stdinReader = bufio.NewReader(os.Stdin)
 
-	proxyPrompt := "请输入代理地址，例如 http://127.0.0.1:7890: "
+	proxyPrompt := "Enter proxy address, e.g. http://127.0.0.1:7890: "
 	if cfg.DefaultProxy != "" {
-		proxyPrompt = fmt.Sprintf("请输入代理地址，直接回车使用默认值 %s: ", cfg.DefaultProxy)
+		proxyPrompt = fmt.Sprintf("Enter proxy address, or press Enter to use the default %s: ", cfg.DefaultProxy)
 	}
 	proxy := mustReadLine(stdinReader, proxyPrompt)
 	if proxy == "" {
 		proxy = cfg.DefaultProxy
 	}
-	email := mustReadLine(stdinReader, "请输入邮箱地址: ")
-	passwordPrompt := "请输入密码，直接回车则自动生成: "
+	email := mustReadLine(stdinReader, "Enter email address: ")
+	passwordPrompt := "Enter password, or press Enter to auto-generate one: "
 	if cfg.PasswordMode == "manual" && cfg.DefaultPassword != "" {
-		passwordPrompt = fmt.Sprintf("请输入密码，直接回车使用默认值 %s: ", maskPassword(cfg.DefaultPassword))
+		passwordPrompt = fmt.Sprintf("Enter password, or press Enter to use the default %s: ", maskPassword(cfg.DefaultPassword))
 	} else if cfg.PasswordMode == "random" {
-		passwordPrompt = "请输入密码，直接回车则使用随机密码: "
+		passwordPrompt = "Enter password, or press Enter to use a random password: "
 	}
 	password := mustReadOptional(stdinReader, passwordPrompt)
 	if strings.TrimSpace(password) == "" {
@@ -90,27 +90,27 @@ func runCLI() {
 			password = cfg.DefaultPassword
 		} else {
 			password = randomPassword(16)
-			fmt.Printf("已自动生成密码: %s\n", password)
+			fmt.Printf("Password generated automatically: %s\n", password)
 		}
 	}
 	if strings.TrimSpace(password) == "" {
 		password = randomPassword(16)
-		fmt.Printf("已自动生成密码: %s\n", password)
+		fmt.Printf("Password generated automatically: %s\n", password)
 	}
 
 	ctx := context.Background()
 	w, err := newWorker(proxy, email)
 	if err != nil {
-		fatalf("初始化失败: %v", err)
+		fatalf("Initialization failed: %v", err)
 	}
 	defer w.close()
 	w.debugCookies("init")
 
 	if loginOnly {
-		fmt.Println("[login-only 模式] 跳过注册流程，直接登录换取 token")
+		fmt.Println("[login-only mode] Skip registration and directly log in to exchange a token")
 		tokens, err := w.loginAndExchangeTokens(ctx, email, password)
 		if err != nil {
-			fatalf("换取 token 失败: %v", err)
+			fatalf("Token exchange failed: %v", err)
 		}
 		pretty, _ := json.MarshalIndent(map[string]any{
 			"email":         email,
@@ -124,28 +124,28 @@ func runCLI() {
 	}
 
 	if err := w.platformAuthorize(ctx, email); err != nil {
-		fatalf("platform authorize 失败: %v", err)
+		fatalf("platform authorize failed: %v", err)
 	}
 	if err := w.registerUser(ctx, email, password); err != nil {
-		fatalf("提交注册密码失败: %v", err)
+		fatalf("Submitting registration password failed: %v", err)
 	}
 	if err := w.sendOTP(ctx); err != nil {
-		fatalf("发送验证码失败: %v", err)
+		fatalf("Sending verification code failed: %v", err)
 	}
 
-	code := mustReadLine(stdinReader, "请输入邮箱验证码: ")
+	code := mustReadLine(stdinReader, "Enter the email verification code: ")
 	if err := w.validateOTP(ctx, code); err != nil {
-		fatalf("验证码校验失败: %v", err)
+		fatalf("Verification code validation failed: %v", err)
 	}
 
 	name := randomName()
 	birthdate := randomBirthdate()
 	if err := w.createAccount(ctx, name, birthdate); err != nil {
-		fatalf("创建账号资料失败: %v", err)
+		fatalf("Creating account profile failed: %v", err)
 	}
 
 	if registerOnly {
-		fmt.Println("[register-only 模式] 注册完成，跳过 token 换取")
+		fmt.Println("[register-only mode] Registration completed, skipping token exchange")
 		pretty, _ := json.MarshalIndent(map[string]any{
 			"email":    email,
 			"password": password,
@@ -158,7 +158,7 @@ func runCLI() {
 
 	tokens, err := w.loginAndExchangeTokens(ctx, email, password)
 	if err != nil {
-		fatalf("换取 token 失败: %v", err)
+		fatalf("Token exchange failed: %v", err)
 	}
 
 	pretty, _ := json.MarshalIndent(map[string]any{
@@ -229,7 +229,7 @@ func (w *worker) registerUser(ctx context.Context, email, password string) error
 	}
 	if status != http.StatusOK {
 		if failedToCreateAccount(payload) {
-			fmt.Fprintln(os.Stderr, "邮箱域名很可能因滥用被封禁，请更换邮箱域名")
+			fmt.Fprintln(os.Stderr, "This mailbox domain may be blocked due to abuse. Try a different mailbox domain.")
 		}
 		return fmt.Errorf("user_register_http_%d%s", status, responseDetail(payload))
 	}
@@ -287,7 +287,7 @@ func (w *worker) createAccount(ctx context.Context, name, birthdate string) erro
 	}
 	if status != http.StatusOK && status != http.StatusFound {
 		if failedToCreateAccount(payload) {
-			fmt.Fprintln(os.Stderr, "邮箱域名很可能因滥用被封禁，请更换邮箱域名")
+			fmt.Fprintln(os.Stderr, "This mailbox domain may be blocked due to abuse. Try a different mailbox domain.")
 		}
 		return fmt.Errorf("create_account_http_%d%s", status, responseDetail(payload))
 	}
@@ -360,15 +360,15 @@ func (w *worker) loginAndExchangeTokens(ctx context.Context, email, password str
 		}
 		return tokenPayload, nil
 	}
-	logStep(email, "登录换 token: 提交邮箱 device_id=%s", w.deviceID)
+	logStep(email, "Token refresh login: submit email device_id=%s", w.deviceID)
 	status, payload, err := w.submitLoginEmail(ctx, email)
 	if err != nil {
-		logStep(email, "登录换 token: 提交邮箱请求失败 err=%v", err)
+		logStep(email, "Token refresh login: submit email request failed err=%v", err)
 		return nil, err
 	}
-	logStep(email, "登录换 token: 提交邮箱返回 status=%d%s", status, responseDetail(payload))
+	logStep(email, "Token refresh login: submit email returned status=%d%s", status, responseDetail(payload))
 	if status == http.StatusConflict {
-		logStep(email, "登录换 token: 邮箱提交返回 conflict，尝试直接授权")
+		logStep(email, "Token refresh login: email submit returned conflict, trying direct authorization")
 		if oauthCode, err := authorizeLogin(); err != nil {
 			return nil, err
 		} else if oauthCode != "" {
@@ -393,13 +393,13 @@ func (w *worker) loginAndExchangeTokens(ctx context.Context, email, password str
 			}
 			return tokenPayload, nil
 		}
-		logStep(email, "登录换 token: 直接授权无 code，重新提交邮箱")
+		logStep(email, "Token refresh login: direct authorization returned no code, re-submitting email")
 		status, payload, err = w.submitLoginEmail(ctx, email)
 		if err != nil {
-			logStep(email, "登录换 token: 重新提交邮箱请求失败 err=%v", err)
+			logStep(email, "Token refresh login: re-submit email request failed err=%v", err)
 			return nil, err
 		}
-		logStep(email, "登录换 token: 重新提交邮箱返回 status=%d%s", status, responseDetail(payload))
+		logStep(email, "Token refresh login: re-submit email returned status=%d%s", status, responseDetail(payload))
 	}
 	if status != http.StatusOK {
 		return nil, fmt.Errorf("email_submit_http_%d%s", status, responseDetail(payload))
@@ -409,11 +409,11 @@ func (w *worker) loginAndExchangeTokens(ctx context.Context, email, password str
 	pagePayload := StringMap(page["payload"])
 	pageType := Clean(page["type"])
 	passwordlessDisabled := ToBool(pagePayload["passwordless_disabled"])
-	logStep(email, "登录换 token: 邮箱提交后页面 page_type=%s continue_url=%s passwordless_disabled=%t", pageType, continueURL, passwordlessDisabled)
+	logStep(email, "Token refresh login: page after email submit page_type=%s continue_url=%s passwordless_disabled=%t", pageType, continueURL, passwordlessDisabled)
 	if pageType == "login_password" && !passwordlessDisabled {
-		logStep(email, "登录换 token: 当前账号支持邮箱验证码登录，发送登录验证码")
+		logStep(email, "Token refresh login: current account supports email verification login, sending login verification code")
 		if err := w.sendLoginOTP(ctx, continueURL); err != nil {
-			logStep(email, "登录换 token: 发送登录验证码失败，尝试回退密码校验 err=%v", err)
+			logStep(email, "Token refresh login: send login verification code failed, falling back to password verification err=%v", err)
 		} else {
 			code, waitErr := w.waitRegisterCode(ctx)
 			if waitErr != nil {
@@ -422,41 +422,41 @@ func (w *worker) loginAndExchangeTokens(ctx context.Context, email, password str
 			if code == "" {
 				return nil, fmt.Errorf("independent login waiting for verification code timed out")
 			}
-			logStep(email, "登录换 token: 已获取登录验证码 code=%s，提交校验", code)
+			logStep(email, "Token refresh login: login verification code received code=%s, submitting validation", code)
 			otpPayload, otpErr := w.validateOTPCode(ctx, code)
 			if otpErr != nil {
-				logStep(email, "登录换 token: 登录验证码校验失败，尝试回退密码校验 err=%v", otpErr)
+				logStep(email, "Token refresh login: login verification code validation failed, falling back to password verification err=%v", otpErr)
 			} else {
 				continueURL = firstNonEmpty(Clean(otpPayload["continue_url"]), continueURL)
 				page = StringMap(otpPayload["page"])
-				logStep(email, "登录换 token: 登录验证码校验通过 continue_url=%s page_type=%s", continueURL, Clean(page["type"]))
+				logStep(email, "Token refresh login: login verification code validation passed continue_url=%s page_type=%s", continueURL, Clean(page["type"]))
 				return w.exchangeTokensFromContinueURL(ctx, continueURL, codeVerifier)
 			}
 		}
 	}
 	headers := w.jsonHeaders(authBase + "/log-in/password")
-	logStep(email, "登录换 token: 构建 password_verify sentinel token")
+	logStep(email, "Token refresh login: build password_verify sentinel token")
 	token, err := w.buildSentinelToken(ctx, "password_verify")
 	if err != nil {
-		logStep(email, "登录换 token: 构建 password_verify sentinel token 失败 err=%v", err)
+		logStep(email, "Token refresh login: build password_verify sentinel token failed err=%v", err)
 		return nil, err
 	}
 	headers["openai-sentinel-token"] = token
-	logStep(email, "登录换 token: 提交密码校验 password_len=%d password_hash=%s sentinel_token_len=%d", len(Clean(password)), shortSecretHash(password), len(token))
+	logStep(email, "Token refresh login: submit password verification password_len=%d password_hash=%s sentinel_token_len=%d", len(Clean(password)), shortSecretHash(password), len(token))
 	status, payload, err = w.request(ctx, http.MethodPost, authBase+"/api/accounts/password/verify", map[string]any{
 		"password": password,
 	}, headers, false)
 	if err != nil {
-		logStep(email, "登录换 token: 密码校验请求失败 err=%v", err)
+		logStep(email, "Token refresh login: password verification request failed err=%v", err)
 		return nil, err
 	}
-	logStep(email, "登录换 token: 密码校验返回 status=%d%s", status, responseDetail(payload))
+	logStep(email, "Token refresh login: password verification returned status=%d%s", status, responseDetail(payload))
 	if status != http.StatusOK {
 		return nil, fmt.Errorf("password_verify_http_%d%s", status, responseDetail(payload))
 	}
 	continueURL = Clean(payload["continue_url"])
 	page = StringMap(payload["page"])
-	logStep(email, "登录换 token: 密码校验通过 continue_url=%s page_type=%s", continueURL, Clean(page["type"]))
+	logStep(email, "Token refresh login: password verification passed continue_url=%s page_type=%s", continueURL, Clean(page["type"]))
 	if Clean(page["type"]) == "email_otp_verification" || strings.Contains(continueURL, "email-verification") || strings.Contains(continueURL, "email-otp") {
 		code, waitErr := w.waitRegisterCode(ctx)
 		if waitErr != nil {
@@ -519,7 +519,7 @@ func (w *worker) waitRegisterCode(ctx context.Context) (string, error) {
 	if stdinReader == nil {
 		return "", nil
 	}
-	fmt.Print("请输入登录流程收到的邮箱验证码: ")
+		fmt.Print("Enter the email verification code received during login flow: ")
 	line, err := stdinReader.ReadString('\n')
 	if err != nil && !strings.Contains(err.Error(), "EOF") {
 		return "", err
@@ -545,7 +545,7 @@ func (w *worker) sendLoginOTP(ctx context.Context, referer string) error {
 	if err != nil {
 		return err
 	}
-	logStep(w.mail, "登录换 token: 进入登录验证码页面返回 status=%d%s", status, responseDetail(payload))
+	logStep(w.mail, "Token refresh login: entering login verification page returned status=%d%s", status, responseDetail(payload))
 	if status != http.StatusOK || strings.Contains(Clean(payload["_final_url"]), "/error") {
 		return fmt.Errorf("login_otp_page_http_%d%s", status, responseDetail(payload))
 	}
@@ -556,7 +556,7 @@ func (w *worker) sendLoginOTP(ctx context.Context, referer string) error {
 	if err != nil {
 		return err
 	}
-	logStep(w.mail, "登录换 token: 发送登录验证码返回 status=%d%s", status, responseDetail(payload))
+	logStep(w.mail, "Token refresh login: send login verification code returned status=%d%s", status, responseDetail(payload))
 	if status == http.StatusFound {
 		location := Clean(payload["_location"])
 		if location == "" {
@@ -565,7 +565,7 @@ func (w *worker) sendLoginOTP(ctx context.Context, referer string) error {
 		if strings.Contains(location, "/error") {
 			return fmt.Errorf("send_login_otp_error_redirect location=%s%s", location, responseDetail(payload))
 		}
-		logStep(w.mail, "登录换 token: 发送登录验证码 302 location=%s", location)
+		logStep(w.mail, "Token refresh login: send login verification code 302 location=%s", location)
 	}
 	if strings.Contains(Clean(payload["_final_url"]), "/error") {
 		return fmt.Errorf("send_login_otp_error_redirect%s", responseDetail(payload))
@@ -1268,7 +1268,7 @@ func mustReadLine(reader *bufio.Reader, prompt string) string {
 	fmt.Print(prompt)
 	line, err := reader.ReadString('\n')
 	if err != nil && !strings.Contains(err.Error(), "EOF") {
-		fatalf("读取输入失败: %v", err)
+		fatalf("Failed to read input: %v", err)
 	}
 	return strings.TrimSpace(line)
 }
@@ -1277,7 +1277,7 @@ func mustReadOptional(reader *bufio.Reader, prompt string) string {
 	fmt.Print(prompt)
 	line, err := reader.ReadString('\n')
 	if err != nil && !strings.Contains(err.Error(), "EOF") {
-		fatalf("读取输入失败: %v", err)
+		fatalf("Failed to read input: %v", err)
 	}
 	return strings.TrimSpace(line)
 }

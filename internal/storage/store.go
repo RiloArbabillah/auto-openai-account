@@ -468,7 +468,7 @@ func (s *Store) RecalculateJob(jobID int64, finalStatus string) error {
 }
 func (s *Store) StopJob(jobID int64) error {
 	ts := now()
-	if _, err := s.db.Exec(`UPDATE register_job_items SET status='failed', error='手动结束任务', finished_at=COALESCE(finished_at, ?), updated_at=? WHERE job_id=? AND status IN ('pending','running')`, ts, ts, jobID); err != nil {
+	if _, err := s.db.Exec(`UPDATE register_job_items SET status='failed', error='Job stopped manually', finished_at=COALESCE(finished_at, ?), updated_at=? WHERE job_id=? AND status IN ('pending','running')`, ts, ts, jobID); err != nil {
 		return err
 	}
 	return s.RecalculateJob(jobID, domain.JobStatusStopped)

@@ -35,6 +35,8 @@ var outlookTokenEndpoints = []string{
 	"https://login.microsoftonline.com/common/oauth2/v2.0/token",
 	"https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
 	"https://login.live.com/oauth20_token.srf",
+	"https://login.microsoftonline.com",
+	"https://login.live.com",
 }
 
 var outlookTokenScopes = []string{
@@ -62,19 +64,19 @@ func (p OTPProvider) Fetch(ctx context.Context) (string, error) {
 	deadline := time.Now().Add(timeout)
 	var lastErr error
 	attempt := 1
-	logStep(p.Mailbox.Email, "开始轮询邮箱验证码 timeout=%s poll=%s imap=%s:%d auth=%s", timeout, poll, settings.IMAPHost, settings.IMAPPort, settings.IMAPAuthMode)
+	logStep(p.Mailbox.Email, "Start polling email verification code timeout=%s poll=%s imap=%s:%d auth=%s", timeout, poll, settings.IMAPHost, settings.IMAPPort, settings.IMAPAuthMode)
 	for time.Now().Before(deadline) {
-		logStep(p.Mailbox.Email, "邮箱验证码轮询第 %d 次", attempt)
+		logStep(p.Mailbox.Email, "Email verification code poll attempt %d", attempt)
 		code, err := fetchIMAPOTP(ctx, settings, p.Mailbox, p.Since)
 		if err == nil && code != "" {
-			logStep(p.Mailbox.Email, "邮箱验证码获取成功 code=%s", code)
+			logStep(p.Mailbox.Email, "Email verification code fetched successfully code=%s", code)
 			return code, nil
 		}
 		if err != nil {
 			lastErr = err
-			logStep(p.Mailbox.Email, "邮箱验证码轮询失败 attempt=%d err=%v", attempt, err)
+			logStep(p.Mailbox.Email, "Email verification code poll failed attempt=%d err=%v", attempt, err)
 		} else {
-			logStep(p.Mailbox.Email, "本次未找到验证码，等待 %s 后重试", poll)
+			logStep(p.Mailbox.Email, "No verification code found this round, retrying after %s", poll)
 		}
 		attempt++
 		select {
@@ -84,16 +86,16 @@ func (p OTPProvider) Fetch(ctx context.Context) (string, error) {
 		}
 	}
 	if lastErr != nil {
-		logStep(p.Mailbox.Email, "邮箱验证码超时，最后错误=%v", lastErr)
+		logStep(p.Mailbox.Email, "Email verification code timeout, last error=%v", lastErr)
 		return "", fmt.Errorf("otp timeout: %w", lastErr)
 	}
-	logStep(p.Mailbox.Email, "邮箱验证码超时，未找到验证码邮件")
+	logStep(p.Mailbox.Email, "Email verification code timeout, no verification email found")
 	return "", fmt.Errorf("otp timeout")
 }
 
 func fetchIMAPOTP(ctx context.Context, settings Settings, mailbox Mailbox, since time.Time) (string, error) {
 	addr := net.JoinHostPort(settings.IMAPHost, strconv.Itoa(settings.IMAPPort))
-	logStep(mailbox.Email, "连接 IMAP %s", addr)
+	logStep(mailbox.Email, "Connect IMAP %s", addr)
 	conn, err := dialIMAPTLS(ctx, settings, addr)
 	if err != nil {
 		return "", err
@@ -105,39 +107,39 @@ func fetchIMAPOTP(ctx context.Context, settings Settings, mailbox Mailbox, since
 		return "", err
 	}
 	client := &rawIMAP{conn: conn, reader: reader, seq: 1}
-	logStep(mailbox.Email, "IMAP 登录认证")
+	logStep(mailbox.Email, "IMAP authenticate")
 	if err := client.authenticate(ctx, settings, mailbox); err != nil {
 		return "", err
 	}
-	logStep(mailbox.Email, "IMAP 选择 INBOX")
+	logStep(mailbox.Email, "IMAP select INBOX")
 	if _, err := client.command("SELECT INBOX"); err != nil {
 		return "", err
 	}
-	logStep(mailbox.Email, "IMAP 搜索全部邮件")
+	logStep(mailbox.Email, "IMAP search all mail")
 	searchResp, err := client.command("SEARCH ALL")
 	if err != nil {
 		return "", err
 	}
 	ids := parseIMAPIDs(searchResp)
 	if len(ids) == 0 {
-		logStep(mailbox.Email, "INBOX 没有邮件")
+		logStep(mailbox.Email, "INBOX has no mail")
 		return "", nil
 	}
 	sort.Sort(sort.Reverse(sort.IntSlice(ids)))
 	if len(ids) > 20 {
 		ids = ids[:20]
 	}
-	logStep(mailbox.Email, "准备检查最近 %d 封邮件 ids=%v", len(ids), ids)
+	logStep(mailbox.Email, "Preparing to inspect the latest %d emails ids=%v", len(ids), ids)
 	for _, id := range ids {
-		logStep(mailbox.Email, "读取邮件 id=%d", id)
+		logStep(mailbox.Email, "Read email id=%d", id)
 		resp, err := client.command(fmt.Sprintf("FETCH %d (INTERNALDATE BODY.PEEK[])", id))
 		if err != nil {
-			logStep(mailbox.Email, "读取邮件失败 id=%d err=%v", id, err)
+			logStep(mailbox.Email, "Read email failed id=%d err=%v", id, err)
 			continue
 		}
 		mailTime := mailReceivedTime(resp)
 		if !since.IsZero() && !mailTime.IsZero() && mailTime.Before(since.Add(-5*time.Second)) {
-			logStep(mailbox.Email, "邮件 id=%d 跳过：时间 %s 早于本次验证码请求 %s", id, mailTime.Format(time.RFC3339), since.Format(time.RFC3339))
+			logStep(mailbox.Email, "Email id=%d skipped: timestamp %s is earlier than this verification request %s", id, mailTime.Format(time.RFC3339), since.Format(time.RFC3339))
 			continue
 		}
 		if code := extractOTPFromMail(mailbox.Email, id, resp); code != "" {
@@ -234,7 +236,7 @@ func outlookIMAPAccessToken(ctx context.Context, mailbox Mailbox, proxy string) 
 				token, err = requestOutlookAccessToken(ctx, endpoint, clientID, refreshToken, scope, proxy)
 			}
 			if err == nil && token != "" {
-				logStep(mailbox.Email, "Outlook access token 刷新成功 endpoint=%s", endpoint)
+				logStep(mailbox.Email, "Outlook access token refreshed successfully endpoint=%s", endpoint)
 				return token, nil
 			}
 			if err != nil {
@@ -333,7 +335,7 @@ func parseIMAPIDs(resp string) []int {
 func extractOTPFromMail(email string, id int, raw string) string {
 	lower := strings.ToLower(raw)
 	if !strings.Contains(lower, openAIOTPFrom) {
-		logStep(email, "邮件 id=%d 跳过：发件人不是 %s", id, openAIOTPFrom)
+		logStep(email, "Email id=%d skipped: sender is not %s", id, openAIOTPFrom)
 		return ""
 	}
 	body := imapMailBody(raw)
@@ -346,10 +348,10 @@ func extractOTPFromMail(email string, id int, raw string) string {
 		code = otpCodeRE.FindString(visibleText)
 	}
 	if code == "" {
-		logStep(email, "邮件 id=%d 来自 %s，但可见正文未匹配到 6 位数字", id, openAIOTPFrom)
+		logStep(email, "Email id=%d from %s did not contain a visible 6-digit code", id, openAIOTPFrom)
 		return ""
 	}
-	logStep(email, "邮件 id=%d 来自 %s，可见正文匹配到 6 位验证码 code=%s context=%q", id, openAIOTPFrom, code, otpContext(visibleText, code))
+	logStep(email, "Email id=%d from %s matched a visible 6-digit code code=%s context=%q", id, openAIOTPFrom, code, otpContext(visibleText, code))
 	return code
 }
 

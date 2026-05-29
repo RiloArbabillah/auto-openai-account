@@ -29,6 +29,13 @@ export function ProxyPoolPage({
     setSettingsDraft(next);
     saveSettings(next);
   };
+  function clearAll() {
+    if (!settingsDraft.proxies.length) return;
+    if (!window.confirm(`Delete all ${settingsDraft.proxies.length} proxies?`)) {
+      return;
+    }
+    persist([]);
+  }
   const remove = (i: number) =>
     persist(settingsDraft.proxies.filter((_, idx) => idx !== i));
   function addFromText() {
@@ -102,6 +109,13 @@ export function ProxyPoolPage({
               className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"
             >
               Add Proxy
+            </button>
+            <button
+              onClick={clearAll}
+              disabled={!settingsDraft.proxies.length}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-bold text-rose-700 disabled:opacity-50"
+            >
+              Clear All
             </button>
             <button
               onClick={testAll}

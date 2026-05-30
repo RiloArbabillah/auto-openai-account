@@ -19,6 +19,7 @@ export function MailboxesPage({
   deleteMailboxes,
   resetMailboxes,
   startLoginJob,
+  testMailboxConnection,
   busy,
 }: {
   mailboxes: Mailbox[];
@@ -29,6 +30,7 @@ export function MailboxesPage({
   deleteMailboxes: (ids: number[]) => void;
   resetMailboxes: (ids: number[]) => void;
   startLoginJob: (ids: number[]) => void;
+  testMailboxConnection: (id: number) => void;
   busy: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
@@ -210,6 +212,13 @@ export function MailboxesPage({
                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
                   >
                     Login
+                  </button>
+                  <button
+                    onClick={() => testMailboxConnection(m.id)}
+                    disabled={busy}
+                    className="rounded-xl border bg-white px-3 py-2 text-xs font-bold disabled:opacity-50"
+                  >
+                    Test Email
                   </button>
                   <button
                     onClick={() => resetMailboxes([m.id])}

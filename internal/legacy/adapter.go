@@ -1,6 +1,10 @@
 package legacy
 
-import "github.com/79E/auto-openai-account/internal/domain"
+import (
+	"context"
+
+	"github.com/79E/auto-openai-account/internal/domain"
+)
 
 func CompactTokenJSON(tokens map[string]any) string {
 	return compactTokenJSON(tokens)
@@ -39,4 +43,10 @@ func SettingsFromDomain(settings domain.Settings, proxy string) Settings {
 		IMAPAuthMode:           settings.IMAPAuthMode,
 		Listen:                 settings.Listen,
 	}
+}
+
+func TestMailboxIMAP(ctx context.Context, mailbox domain.Mailbox, settings domain.Settings, proxy string) error {
+	legacyMailbox := MailboxFromDomain(mailbox)
+	legacySettings := SettingsFromDomain(settings, proxy)
+	return testMailboxIMAP(ctx, legacyMailbox, legacySettings)
 }

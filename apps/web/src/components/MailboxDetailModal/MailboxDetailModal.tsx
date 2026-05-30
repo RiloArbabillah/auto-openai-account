@@ -15,6 +15,7 @@ export function MailboxDetailModal({
   onUpdateDraft,
   onUpdateCredentialLine,
   onSave,
+  onTestConnection,
 }: {
   detail: Mailbox;
   detailDraft: MailboxUpdate;
@@ -25,6 +26,7 @@ export function MailboxDetailModal({
   onUpdateDraft: (key: keyof MailboxUpdate, value: string) => void;
   onUpdateCredentialLine: (value: string) => void;
   onSave: () => void;
+  onTestConnection: () => void;
 }) {
   return (
     <Modal
@@ -88,6 +90,14 @@ export function MailboxDetailModal({
           )}
         </div>
         <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onTestConnection}
+            disabled={busy || !detailDraft.email.trim()}
+            className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
+          >
+            Test Email
+          </button>
           <button
             type="button"
             onClick={onClose}

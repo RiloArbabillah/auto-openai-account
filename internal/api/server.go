@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/79E/auto-openai-account/internal/domain"
+	"github.com/79E/auto-openai-account/internal/legacy"
 	"github.com/79E/auto-openai-account/internal/proxypool"
 	"github.com/79E/auto-openai-account/internal/runner"
 	"github.com/79E/auto-openai-account/internal/smsbiz"
@@ -195,6 +196,10 @@ func (s *Server) handleMailboxByID(w http.ResponseWriter, r *http.Request) {
 		s.handleMailboxLogin(w, r, id)
 		return
 	}
+	if suffix == "test" {
+		s.handleMailboxTest(w, r, id)
+		return
+	}
 	if suffix != "" {
 		http.NotFound(w, r)
 		return
@@ -279,6 +284,32 @@ func (s *Server) handleMailboxLogin(w http.ResponseWriter, r *http.Request, id i
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "queued": true, "job": job})
+}
+
+func (s *Server) handleMailboxTest(w http.ResponseWriter, r *http.Request, id int64) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	mailbox, found, err := s.store.GetMailbox(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !found {
+		writeError(w, http.StatusNotFound, fmt.Errorf("mailbox not found"))
+		return
+	}
+	settings, err := s.store.LoadSettings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if err := legacy.TestMailboxIMAP(r.Context(), mailbox, settings, ""); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("%s", legacy.ExplainError(err.Error())))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Mailbox IMAP connection succeeded"})
 }
 
 func (s *Server) handleLoginJobs(w http.ResponseWriter, r *http.Request) {

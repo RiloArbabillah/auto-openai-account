@@ -10,6 +10,7 @@ import { appName, emptyStats, nav, routeTitles } from "./lib/constants";
 import { canExportJobTokens, downloadJsonFile, formatFileDate } from "./lib/format";
 import { JobsPage } from "./pages/JobsPage/JobsPage";
 import { MailboxesPage } from "./pages/MailboxesPage/MailboxesPage";
+import { EmailSettingsPage } from "./pages/EmailSettingsPage/EmailSettingsPage";
 import { Overview } from "./pages/Overview/Overview";
 import { PluginsPage } from "./pages/PluginsPage/PluginsPage";
 import { ProxyPoolPage } from "./pages/ProxyPoolPage/ProxyPoolPage";
@@ -417,6 +418,38 @@ function App() {
     });
   }
 
+  async function testMailboxConnection() {
+	if (!mailboxDetail || !mailboxDetailDraft) return;
+	setBusy(true);
+	try {
+		await updateMailbox(mailboxDetail.id, mailboxDetailDraft);
+		const result = await api<{ ok: boolean; message: string }>(`/api/mailboxes/${mailboxDetail.id}/test`, {
+			method: "POST",
+		});
+		showToast(result.message || "Mailbox IMAP connection succeeded", "success");
+		await refresh();
+	} catch (error) {
+		showToast(error instanceof Error ? error.message : "Mailbox IMAP test failed", "error");
+	} finally {
+		setBusy(false);
+	}
+  }
+
+  async function testMailboxConnectionByID(id: number) {
+    setBusy(true);
+    try {
+      const result = await api<{ ok: boolean; message: string }>(`/api/mailboxes/${id}/test`, {
+        method: "POST",
+      });
+      showToast(result.message || "Mailbox IMAP connection succeeded", "success");
+      await refresh();
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Mailbox IMAP test failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function stopTask(id: number) {
     if (!window.confirm(`Stop job #${id}?`)) return;
     setBusy(true);
@@ -585,6 +618,7 @@ function App() {
             onUpdateDraft={updateMailboxDetailDraft}
             onUpdateCredentialLine={updateCredentialLine}
             onSave={saveMailboxDetail}
+            onTestConnection={testMailboxConnection}
           />
         )}
         {tokenExportConfirm && (
@@ -631,6 +665,7 @@ function App() {
                 startLoginJob={(ids) =>
                   settingsDraft && createLoginTask(settingsDraft, ids)
                 }
+                testMailboxConnection={testMailboxConnectionByID}
                 busy={busy}
               />
             }
@@ -652,6 +687,30 @@ function App() {
                 selectJob={loadJob}
                 busy={busy}
               />
+            }
+          />
+          <Route
+            path="/email"
+            element={
+              settingsDraft ? (
+                <EmailSettingsPage
+                  settingsDraft={settingsDraft}
+                  setSettingsDraft={setSettingsDraft}
+                  saveSettings={async (next) => {
+                    try {
+                      await saveSettings(next);
+                      showToast("Email settings updated", "success");
+                    } catch (e) {
+                      showToast(
+                        e instanceof Error ? e.message : "Save failed",
+                        "error",
+                      );
+                      throw e;
+                    }
+                  }}
+                  busy={busy}
+                />
+              ) : null
             }
           />
           <Route

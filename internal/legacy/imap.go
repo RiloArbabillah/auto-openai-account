@@ -149,6 +149,29 @@ func fetchIMAPOTP(ctx context.Context, settings Settings, mailbox Mailbox, since
 	return "", nil
 }
 
+func testMailboxIMAP(ctx context.Context, mailbox Mailbox, settings Settings) error {
+	settings = normalizeSettings(settings)
+	addr := net.JoinHostPort(settings.IMAPHost, strconv.Itoa(settings.IMAPPort))
+	conn, err := dialIMAPTLS(ctx, settings, addr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(45 * time.Second))
+	reader := bufio.NewReader(conn)
+	if _, err := reader.ReadString('\n'); err != nil {
+		return err
+	}
+	client := &rawIMAP{conn: conn, reader: reader, seq: 1}
+	if err := client.authenticate(ctx, settings, mailbox); err != nil {
+		return err
+	}
+	if _, err := client.command("SELECT INBOX"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func dialIMAPTLS(ctx context.Context, settings Settings, addr string) (*tls.Conn, error) {
 	dialer := &net.Dialer{Timeout: 20 * time.Second}
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, &tls.Config{ServerName: settings.IMAPHost, MinVersion: tls.VersionTLS12})

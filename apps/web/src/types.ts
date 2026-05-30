@@ -115,6 +115,8 @@ export type ProxyTestResult = {
   proxy: string;
   ok: boolean;
   ip?: string;
+  country?: string;
+  country_code?: string;
   latency_ms: number;
   error?: string;
 };

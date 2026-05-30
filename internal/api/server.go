@@ -80,7 +80,7 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 	}
 	timeout := time.Duration(body.TimeoutSeconds) * time.Second
 	if timeout <= 0 {
-		timeout = 15 * time.Second
+		timeout = 25 * time.Second
 	}
 	candidates := body.Proxies
 	if body.Proxy != "" {
@@ -100,6 +100,8 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 			Proxy:     result.Proxy,
 			OK:        result.OK,
 			IP:        result.IP,
+			Country:   result.Country,
+			CountryCode: result.CountryCode,
 			LatencyMS: result.LatencyMS,
 			Error:     result.Error,
 		})

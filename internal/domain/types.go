@@ -34,6 +34,8 @@ type ProxyTestResult struct {
 	Proxy     string `json:"proxy"`
 	OK        bool   `json:"ok"`
 	IP        string `json:"ip,omitempty"`
+	Country   string `json:"country,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
 	LatencyMS int64  `json:"latency_ms"`
 	Error     string `json:"error,omitempty"`
 }

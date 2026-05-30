@@ -17,6 +17,8 @@ type TestResult struct {
 	Proxy     string `json:"proxy"`
 	OK        bool   `json:"ok"`
 	IP        string `json:"ip,omitempty"`
+	Country   string `json:"country,omitempty"`
+	CountryCode string `json:"country_code,omitempty"`
 	LatencyMS int64  `json:"latency_ms"`
 	Error     string `json:"error,omitempty"`
 }
@@ -24,7 +26,7 @@ type TestResult struct {
 func Test(ctx context.Context, proxyURL string, timeout time.Duration) TestResult {
 	result := TestResult{Proxy: strings.TrimSpace(proxyURL)}
 	if timeout <= 0 {
-		timeout = 15 * time.Second
+		timeout = 25 * time.Second
 	}
 	client, err := clientForProxy(result.Proxy, timeout)
 	if err != nil {
@@ -61,7 +63,41 @@ func Test(ctx context.Context, proxyURL string, timeout time.Duration) TestResul
 		result.Error = "empty ip response"
 		return result
 	}
+	country, countryCode := lookupCountry(ctx, client, result.IP)
+	result.Country = country
+	result.CountryCode = countryCode
 	return result
+}
+
+func lookupCountry(ctx context.Context, client *http.Client, ip string) (string, string) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return "", ""
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://ipwho.is/"+url.PathEscape(ip), nil)
+	if err != nil {
+		return "", ""
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", ""
+	}
+	var payload struct {
+		Success     bool   `json:"success"`
+		Country     string `json:"country"`
+		CountryCode string `json:"country_code"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return "", ""
+	}
+	if !payload.Success {
+		return "", ""
+	}
+	return strings.TrimSpace(payload.Country), strings.TrimSpace(payload.CountryCode)
 }
 
 func clientForProxy(candidate string, timeout time.Duration) (*http.Client, error) {

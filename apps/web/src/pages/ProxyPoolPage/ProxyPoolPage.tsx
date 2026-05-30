@@ -9,7 +9,7 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { Modal } from "../../components/Modal/Modal";
 import styles from "./ProxyPoolPage.module.css";
 
-const proxyTestConcurrency = 15;
+const proxyTestConcurrency = 10;
 
 export function ProxyPoolPage({
   settingsDraft,
@@ -224,6 +224,7 @@ export function ProxyPoolPage({
                         text={r.ok ? "Available" : "Failed"}
                       />
                       <span>IP: {r.ip || "-"}</span>
+                      <span>Country: {r.country || (r.country_code || "-")}</span>
                       <span>Latency: {r.latency_ms}ms</span>
                       {r.error && (
                         <span className="text-rose-600">{r.error}</span>

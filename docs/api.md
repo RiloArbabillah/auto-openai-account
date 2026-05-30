@@ -184,12 +184,14 @@ Item statuses:
   "proxy": "http://127.0.0.1:8080",
   "ok": true,
   "ip": "203.0.113.10",
+  "country": "Indonesia",
+  "country_code": "ID",
   "latency_ms": 320,
   "error": ""
 }
 ```
 
-`ip` and `error` may be omitted when empty.
+`ip`, `country`, `country_code`, and `error` may be omitted when empty.
 
 ### SMSCatalog
 

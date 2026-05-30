@@ -9,6 +9,8 @@ import { EmptyState } from "../../components/EmptyState/EmptyState";
 import { Modal } from "../../components/Modal/Modal";
 import styles from "./ProxyPoolPage.module.css";
 
+const proxyTestConcurrency = 15;
+
 export function ProxyPoolPage({
   settingsDraft,
   setSettingsDraft,
@@ -82,6 +84,40 @@ export function ProxyPoolPage({
     setAddText("");
     setAddOpen(false);
   }
+  async function testMany(proxies: string[]) {
+    const ps = proxies.filter(Boolean);
+    if (!ps.length) return;
+    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
+    const queue = [...ps];
+    const workerCount = Math.min(proxyTestConcurrency, queue.length);
+    await Promise.all(
+      Array.from({ length: workerCount }, async () => {
+        while (queue.length > 0) {
+          const proxy = queue.shift();
+          if (!proxy) return;
+          try {
+            const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
+              method: "POST",
+              body: JSON.stringify({ proxy }),
+            });
+            setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
+          } catch (error) {
+            setResults((prev) => ({
+              ...prev,
+              [proxy]: {
+                proxy,
+                ok: false,
+                latency_ms: 0,
+                error: error instanceof Error ? error.message : "Test failed",
+              },
+            }));
+          } finally {
+            setTesting((prev) => prev.filter((item) => item !== proxy));
+          }
+        }
+      }),
+    );
+  }
   async function test(proxy: string) {
     if (!proxy.trim()) return;
     setTesting((prev) => Array.from(new Set([...prev, proxy])));
@@ -96,88 +132,13 @@ export function ProxyPoolPage({
     }
   }
   async function testAll() {
-    const ps = settingsDraft.proxies.filter(Boolean);
-    if (!ps.length) return;
-    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
-    await Promise.all(
-      ps.map(async (proxy) => {
-        try {
-          const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
-            method: "POST",
-            body: JSON.stringify({ proxy }),
-          });
-          setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
-        } catch (error) {
-          setResults((prev) => ({
-            ...prev,
-            [proxy]: {
-              proxy,
-              ok: false,
-              latency_ms: 0,
-              error: error instanceof Error ? error.message : "Test failed",
-            },
-          }));
-        } finally {
-          setTesting((prev) => prev.filter((item) => item !== proxy));
-        }
-      }),
-    );
+    await testMany(settingsDraft.proxies);
   }
   async function testUntested() {
-    const ps = untestedProxies.filter(Boolean);
-    if (!ps.length) return;
-    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
-    await Promise.all(
-      ps.map(async (proxy) => {
-        try {
-          const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
-            method: "POST",
-            body: JSON.stringify({ proxy }),
-          });
-          setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
-        } catch (error) {
-          setResults((prev) => ({
-            ...prev,
-            [proxy]: {
-              proxy,
-              ok: false,
-              latency_ms: 0,
-              error: error instanceof Error ? error.message : "Test failed",
-            },
-          }));
-        } finally {
-          setTesting((prev) => prev.filter((item) => item !== proxy));
-        }
-      }),
-    );
+    await testMany(untestedProxies);
   }
   async function testFailed() {
-    const ps = failedProxies.filter(Boolean);
-    if (!ps.length) return;
-    setTesting((prev) => Array.from(new Set([...prev, ...ps])));
-    await Promise.all(
-      ps.map(async (proxy) => {
-        try {
-          const d = await api<{ items: ProxyTestResult[] }>("/api/proxy/test", {
-            method: "POST",
-            body: JSON.stringify({ proxy }),
-          });
-          setResults((prev) => ({ ...prev, [proxy]: d.items[0] }));
-        } catch (error) {
-          setResults((prev) => ({
-            ...prev,
-            [proxy]: {
-              proxy,
-              ok: false,
-              latency_ms: 0,
-              error: error instanceof Error ? error.message : "Test failed",
-            },
-          }));
-        } finally {
-          setTesting((prev) => prev.filter((item) => item !== proxy));
-        }
-      }),
-    );
+    await testMany(failedProxies);
   }
   const hasTesting = testing.length > 0;
   return (

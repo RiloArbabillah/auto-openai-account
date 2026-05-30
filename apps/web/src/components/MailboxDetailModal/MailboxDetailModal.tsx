@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { formatToken, jobTypeText, resultText } from "../../lib/format";
 import type { Mailbox, MailboxUpdate } from "../../types";
 import { Field } from "../Field/Field";
@@ -16,6 +17,7 @@ export function MailboxDetailModal({
   onUpdateCredentialLine,
   onSave,
   onTestConnection,
+  onSubmitOTP,
 }: {
   detail: Mailbox;
   detailDraft: MailboxUpdate;
@@ -27,7 +29,9 @@ export function MailboxDetailModal({
   onUpdateCredentialLine: (value: string) => void;
   onSave: () => void;
   onTestConnection: () => void;
+  onSubmitOTP: (code: string) => void;
 }) {
+  const [manualOTP, setManualOTP] = useState("");
   return (
     <Modal
       title="Mailbox Details"
@@ -89,6 +93,27 @@ export function MailboxDetailModal({
             />
           )}
         </div>
+        <Field label="Manual OTP">
+          <div className="flex gap-2">
+            <input
+              value={manualOTP}
+              onChange={(event) => setManualOTP(event.target.value)}
+              className="w-full rounded-xl border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="Enter the 6-digit verification code"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                onSubmitOTP(manualOTP);
+                setManualOTP("");
+              }}
+              disabled={busy || !manualOTP.trim()}
+              className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
+            >
+              Submit OTP
+            </button>
+          </div>
+        </Field>
         <div className="flex justify-end gap-2 pt-2">
           <button
             type="button"

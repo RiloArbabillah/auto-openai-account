@@ -200,6 +200,10 @@ func (s *Server) handleMailboxByID(w http.ResponseWriter, r *http.Request) {
 		s.handleMailboxTest(w, r, id)
 		return
 	}
+	if suffix == "otp" {
+		s.handleMailboxOTP(w, r, id)
+		return
+	}
 	if suffix != "" {
 		http.NotFound(w, r)
 		return
@@ -310,6 +314,32 @@ func (s *Server) handleMailboxTest(w http.ResponseWriter, r *http.Request, id in
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Mailbox IMAP connection succeeded"})
+}
+
+func (s *Server) handleMailboxOTP(w http.ResponseWriter, r *http.Request, id int64) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if _, found, err := s.store.GetMailbox(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	} else if !found {
+		writeError(w, http.StatusNotFound, fmt.Errorf("mailbox not found"))
+		return
+	}
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid json body"))
+		return
+	}
+	if err := s.runner.SubmitOTP(id, body.Code); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "Verification code submitted"})
 }
 
 func (s *Server) handleLoginJobs(w http.ResponseWriter, r *http.Request) {

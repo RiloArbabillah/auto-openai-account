@@ -435,6 +435,22 @@ function App() {
 	}
   }
 
+  async function submitMailboxOTP(code: string) {
+	if (!mailboxDetail) return;
+	setBusy(true);
+	try {
+		const result = await api<{ ok: boolean; message: string }>(`/api/mailboxes/${mailboxDetail.id}/otp`, {
+			method: "POST",
+			body: JSON.stringify({ code }),
+		});
+		showToast(result.message || "Verification code submitted", "success");
+	} catch (error) {
+		showToast(error instanceof Error ? error.message : "Failed to submit verification code", "error");
+	} finally {
+		setBusy(false);
+	}
+  }
+
   async function testMailboxConnectionByID(id: number) {
     setBusy(true);
     try {
@@ -619,6 +635,7 @@ function App() {
             onUpdateCredentialLine={updateCredentialLine}
             onSave={saveMailboxDetail}
             onTestConnection={testMailboxConnection}
+            onSubmitOTP={submitMailboxOTP}
           />
         )}
         {tokenExportConfirm && (

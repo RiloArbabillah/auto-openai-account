@@ -23,6 +23,7 @@ type Runner struct {
 	cancel context.CancelFunc
 	subs   map[int64]map[chan domain.RuntimeLog]struct{}
 	active map[string]activeLogContext
+	otp    map[int64]chan string
 }
 
 type activeLogContext struct {
@@ -35,7 +36,7 @@ type activeLogContext struct {
 var roundRobinCounter uint64
 
 func New(store *storage.Store) *Runner {
-	r := &Runner{store: store, subs: map[int64]map[chan domain.RuntimeLog]struct{}{}, active: map[string]activeLogContext{}}
+	r := &Runner{store: store, subs: map[int64]map[chan domain.RuntimeLog]struct{}{}, active: map[string]activeLogContext{}, otp: map[int64]chan string{}}
 	legacy.LogHook = r.handleLegacyLog
 	return r
 }
@@ -267,10 +268,10 @@ func (r *Runner) runRegisterOne(ctx context.Context, jobID int64, mailbox domain
 	defer r.clearActive(mailbox.Email)
 	legacyMailbox := legacy.MailboxFromDomain(mailbox)
 	legacySettings := legacy.SettingsFromDomain(settings, proxy)
-	provider := legacy.OTPProvider{Settings: legacySettings, Mailbox: legacyMailbox, Since: started}
 	registerPass := legacyPasswordForSettings(settings)
 	skipTokenLogin := flow == domain.JobTypeRegister
-	result, err := legacy.RegisterOne(ctx, legacy.RegisterInput{Mailbox: legacyMailbox, Settings: legacySettings, RegisterPass: registerPass, OTPFetcher: provider.Fetch, SkipTokenLogin: skipTokenLogin})
+	otpFetcher := r.otpFetcher(mailbox.ID, legacySettings, legacyMailbox, started)
+	result, err := legacy.RegisterOne(ctx, legacy.RegisterInput{Mailbox: legacyMailbox, Settings: legacySettings, RegisterPass: registerPass, OTPFetcher: otpFetcher, SkipTokenLogin: skipTokenLogin})
 	duration := time.Since(started)
 	if ctx.Err() != nil {
 		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
@@ -312,8 +313,8 @@ func (r *Runner) LoginMailbox(mailbox domain.Mailbox, settings domain.Settings) 
 		defer r.clearActive(mailbox.Email)
 		legacyMailbox := legacy.MailboxFromDomain(mailbox)
 		legacySettings := legacy.SettingsFromDomain(settings, proxy)
-		provider := legacy.OTPProvider{Settings: legacySettings, Mailbox: legacyMailbox, Since: started}
-		tokens, err := legacy.LoginOne(context.Background(), legacyMailbox, legacySettings, provider.Fetch)
+		otpFetcher := r.otpFetcher(mailbox.ID, legacySettings, legacyMailbox, started)
+		tokens, err := legacy.LoginOne(context.Background(), legacyMailbox, legacySettings, otpFetcher)
 		if err != nil {
 			_ = r.store.MarkMailboxLoginResult(mailbox.ID, "", legacy.ExplainError(err.Error()))
 			r.log(domain.RuntimeLog{MailboxID: mailbox.ID, Email: mailbox.Email, Level: "error", Step: "login_failed", Message: legacy.ExplainError(err.Error())})
@@ -334,8 +335,8 @@ func (r *Runner) runLoginOne(ctx context.Context, jobID int64, mailbox domain.Ma
 	defer r.clearActive(mailbox.Email)
 	legacyMailbox := legacy.MailboxFromDomain(mailbox)
 	legacySettings := legacy.SettingsFromDomain(settings, proxy)
-	provider := legacy.OTPProvider{Settings: legacySettings, Mailbox: legacyMailbox, Since: started}
-	tokens, err := legacy.LoginOne(ctx, legacyMailbox, legacySettings, provider.Fetch)
+	otpFetcher := r.otpFetcher(mailbox.ID, legacySettings, legacyMailbox, started)
+	tokens, err := legacy.LoginOne(ctx, legacyMailbox, legacySettings, otpFetcher)
 	duration := time.Since(started)
 	if ctx.Err() != nil {
 		_ = r.store.UpdateJobItem(jobID, mailbox.ID, "failed", "Job stopped manually", duration)
@@ -694,6 +695,68 @@ func (r *Runner) clearActive(email string) {
 	r.mu.Lock()
 	delete(r.active, strings.ToLower(email))
 	r.mu.Unlock()
+}
+
+func (r *Runner) otpFetcher(mailboxID int64, settings legacy.Settings, mailbox legacy.Mailbox, started time.Time) func(context.Context) (string, error) {
+	return func(ctx context.Context) (string, error) {
+		provider := legacy.OTPProvider{Settings: settings, Mailbox: mailbox, Since: started}
+		manual := make(chan string, 1)
+		r.mu.Lock()
+		r.otp[mailboxID] = manual
+		r.mu.Unlock()
+		defer func() {
+			r.mu.Lock()
+			delete(r.otp, mailboxID)
+			r.mu.Unlock()
+		}()
+
+		fetchCtx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		type result struct {
+			code string
+			err  error
+		}
+		results := make(chan result, 1)
+		go func() {
+			code, err := provider.Fetch(fetchCtx)
+			results <- result{code: code, err: err}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return "", ctx.Err()
+			case code := <-manual:
+				code = strings.TrimSpace(code)
+				if code == "" {
+					continue
+				}
+				cancel()
+				return code, nil
+			case result := <-results:
+				return result.code, result.err
+			}
+		}
+	}
+}
+
+func (r *Runner) SubmitOTP(mailboxID int64, code string) error {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return fmt.Errorf("code is required")
+	}
+	r.mu.Lock()
+	ch := r.otp[mailboxID]
+	r.mu.Unlock()
+	if ch == nil {
+		return fmt.Errorf("mailbox is not waiting for a verification code")
+	}
+	select {
+	case ch <- code:
+		return nil
+	default:
+		return fmt.Errorf("mailbox is already processing a verification code")
+	}
 }
 
 func parseLegacyStep(message string) (int, int, string) {

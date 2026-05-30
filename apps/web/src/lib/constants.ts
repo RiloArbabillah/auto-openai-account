@@ -8,6 +8,7 @@ export const nav: Array<{ path: string; label: string; end?: boolean }> = [
   { path: "/mailboxes", label: "Mailboxes" },
   { path: "/jobs", label: "Jobs" },
   { path: "/proxies", label: "Proxies" },
+  { path: "/email", label: "Email Settings" },
   { path: "/sms", label: "SMS Settings" },
   { path: "/plugins", label: "Plugins" },
 ];
@@ -16,6 +17,7 @@ export const routeTitles: Record<string, string> = {
   "/mailboxes": "Mailboxes",
   "/jobs": "Jobs",
   "/proxies": "Proxies",
+  "/email": "Email Settings",
   "/sms": "SMS Settings",
   "/plugins": "Plugins",
 };

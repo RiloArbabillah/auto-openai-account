@@ -601,6 +601,41 @@ Response:
 
 `items` is an array of `ProxyTestResult`.
 
+### POST /api/proxy/import-url
+
+Fetches a ProxyScrape export URL and extracts supported proxy URLs for frontend import.
+
+Request body:
+
+```json
+{
+  "url": "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=json"
+}
+```
+
+Rules:
+
+- Only `https` URLs are accepted.
+- Only host `api.proxyscrape.com` is accepted.
+- The server supports ProxyScrape JSON responses with `proxies[].proxy`.
+- As a fallback, plain text with one proxy URL per line is also accepted.
+
+Supported proxy schemes in the extracted result:
+
+- `http`
+- `https`
+- `socks5`
+- `socks5h`
+
+Response:
+
+```json
+{
+  "items": ["socks5://127.0.0.1:1080"],
+  "total": 1
+}
+```
+
 ### GET /api/stats
 
 Returns dashboard summary counts.

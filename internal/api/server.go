@@ -1,9 +1,12 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,6 +40,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/register-jobs/", s.handleRegisterJobByID)
 	mux.HandleFunc("/api/register-jobs", s.handleRegisterJobs)
 	mux.HandleFunc("/api/login-jobs", s.handleLoginJobs)
+	mux.HandleFunc("/api/proxy/import-url", s.handleProxyImportURL)
 	mux.HandleFunc("/api/proxy/test", s.handleProxyTest)
 	mux.HandleFunc("/api/sms/catalog", s.handleSMSCatalog)
 	mux.HandleFunc("/api/stats", s.handleStats)
@@ -98,13 +102,13 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 	persisted := make([]domain.ProxyTestResult, 0, len(results))
 	for _, result := range results {
 		persisted = append(persisted, domain.ProxyTestResult{
-			Proxy:     result.Proxy,
-			OK:        result.OK,
-			IP:        result.IP,
-			Country:   result.Country,
+			Proxy:       result.Proxy,
+			OK:          result.OK,
+			IP:          result.IP,
+			Country:     result.Country,
 			CountryCode: result.CountryCode,
-			LatencyMS: result.LatencyMS,
-			Error:     result.Error,
+			LatencyMS:   result.LatencyMS,
+			Error:       result.Error,
 		})
 	}
 	if err := s.store.SaveProxyTestResults(persisted); err != nil {
@@ -112,6 +116,164 @@ func (s *Server) handleProxyTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": results})
+}
+
+func (s *Server) handleProxyImportURL(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid json body"))
+		return
+	}
+	target := strings.TrimSpace(body.URL)
+	if target == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("url is required"))
+		return
+	}
+	parsed, err := url.Parse(target)
+	if err != nil || parsed.Host == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid url"))
+		return
+	}
+	if parsed.Scheme != "https" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("only https urls are supported"))
+		return
+	}
+	if !strings.EqualFold(parsed.Hostname(), "api.proxyscrape.com") {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("only api.proxyscrape.com is supported"))
+		return
+	}
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, target, nil)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid url"))
+		return
+	}
+	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Errorf("fetch proxy url: %w", err))
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		writeError(w, http.StatusBadGateway, fmt.Errorf("proxy source returned status %d", resp.StatusCode))
+		return
+	}
+	payload, err := io.ReadAll(io.LimitReader(resp.Body, 5<<20))
+	if err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Errorf("read proxy source: %w", err))
+		return
+	}
+	items, err := parseProxyImportPayload(payload)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": len(items)})
+}
+
+func parseProxyImportPayload(payload []byte) ([]string, error) {
+	trimmed := bytes.TrimSpace(payload)
+	if len(trimmed) == 0 {
+		return nil, fmt.Errorf("proxy source is empty")
+	}
+	type proxyImportItem struct {
+		Proxy string `json:"proxy"`
+	}
+	var jsonBody struct {
+		Proxies []proxyImportItem `json:"proxies"`
+	}
+	if err := json.Unmarshal(trimmed, &jsonBody); err == nil && len(jsonBody.Proxies) > 0 {
+		items := make([]string, 0, len(jsonBody.Proxies))
+		for _, item := range jsonBody.Proxies {
+			proxy := strings.TrimSpace(item.Proxy)
+			if !isSupportedProxyURL(proxy) {
+				continue
+			}
+			items = append(items, proxy)
+		}
+		items = uniqueProxyURLsByHost(items)
+		if len(items) == 0 {
+			return nil, fmt.Errorf("proxy source did not contain any supported proxy urls")
+		}
+		return items, nil
+	}
+	lines := strings.Split(string(trimmed), "\n")
+	items := make([]string, 0, len(lines))
+	for _, line := range lines {
+		proxy := strings.TrimSpace(line)
+		if proxy == "" {
+			continue
+		}
+		if !isSupportedProxyURL(proxy) {
+			continue
+		}
+		items = append(items, proxy)
+	}
+	items = uniqueProxyURLsByHost(items)
+	if len(items) == 0 {
+		return nil, fmt.Errorf("proxy source did not contain any supported proxy urls")
+	}
+	return items, nil
+}
+
+func isSupportedProxyURL(value string) bool {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil || parsed.Host == "" {
+		return false
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "http", "https", "socks5", "socks5h":
+		return true
+	default:
+		return false
+	}
+}
+
+func uniqueProxyURLsByHost(items []string) []string {
+	seen := make(map[string]struct{}, len(items))
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		key := proxyURLHostKey(item)
+		if key == "" {
+			key = item
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, item)
+	}
+	return result
+}
+
+func proxyURLHostKey(value string) string {
+	parsed, err := url.Parse(strings.TrimSpace(value))
+	if err != nil {
+		return ""
+	}
+	host := strings.ToLower(parsed.Hostname())
+	port := parsed.Port()
+	family := proxySchemeFamily(parsed.Scheme)
+	if host == "" || port == "" || family == "" {
+		return ""
+	}
+	return family + ":" + host + ":" + port
+}
+
+func proxySchemeFamily(scheme string) string {
+	switch strings.ToLower(strings.TrimSpace(scheme)) {
+	case "socks5", "socks5h":
+		return "socks"
+	case "http", "https":
+		return "http"
+	default:
+		return ""
+	}
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {

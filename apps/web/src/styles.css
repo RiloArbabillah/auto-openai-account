@@ -31,7 +31,8 @@ body {
 }
 
 [data-theme="dark"] [class~="bg-slate-50"],
-[data-theme="dark"] [class~="bg-slate-50/70"] {
+[data-theme="dark"] [class~="bg-slate-50/70"],
+[data-theme="dark"] [class~="bg-slate-50/80"] {
   background-color: rgb(15 23 42 / 0.72) !important;
 }
 
@@ -47,6 +48,10 @@ body {
 
 [data-theme="dark"] [class~="bg-rose-50"] {
   background-color: rgb(127 29 29 / 0.22) !important;
+}
+
+[data-theme="dark"] [class~="bg-amber-50"] {
+  background-color: rgb(120 53 15 / 0.22) !important;
 }
 
 [data-theme="dark"] [class~="bg-slate-950"] {

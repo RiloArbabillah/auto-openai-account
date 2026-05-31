@@ -10,6 +10,76 @@ import { Modal } from "../../components/Modal/Modal";
 import styles from "./ProxyPoolPage.module.css";
 
 const proxyTestConcurrency = 10;
+const proxyScrapeBaseURL =
+  "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&proxy_format=protocolipport&format=json";
+const countryOptions = ["JP", "US", "TH", "ID", "SG", "MY", "VN", "PH", "KR", "HK", "TW"];
+const protocolOptions = ["http", "https", "socks5", "socks5h"];
+const defaultCountries = ["JP", "US", "TH"];
+const defaultProtocols = ["socks5", "http", "https"];
+const proxyImportCountriesKey = "proxy-import-countries";
+const proxyImportProtocolsKey = "proxy-import-protocols";
+
+function buildProxyImportURL(countries: string[], protocols: string[]) {
+  const params = new URLSearchParams();
+  if (countries.length) {
+    params.set("country", countries.join(","));
+  }
+  if (protocols.length) {
+    params.set("protocol", protocols.join(","));
+  }
+  const suffix = params.toString();
+  return suffix ? `${proxyScrapeBaseURL}&${suffix}` : proxyScrapeBaseURL;
+}
+
+function proxyHostKey(value: string) {
+  try {
+    const parsed = new URL(value);
+    const host = parsed.hostname.toLowerCase();
+    const port = parsed.port;
+    const family =
+      parsed.protocol === "socks5:" || parsed.protocol === "socks5h:"
+        ? "socks"
+        : parsed.protocol === "http:" || parsed.protocol === "https:"
+          ? "http"
+          : "";
+    return host && port && family ? `${family}:${host}:${port}` : value.trim().toLowerCase();
+  } catch {
+    return value.trim().toLowerCase();
+  }
+}
+
+function mergeUniqueProxiesByHost(existing: string[], incoming: string[]) {
+  const seen = new Set(existing.map(proxyHostKey));
+  const added: string[] = [];
+  for (const proxy of incoming) {
+    const key = proxyHostKey(proxy);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    added.push(proxy);
+  }
+  return {
+    merged: [...existing, ...added],
+    addedCount: added.length,
+    skippedCount: incoming.length - added.length,
+  };
+}
+
+function readStoredSelection(storageKey: string, allowed: string[], fallback: string[]) {
+  const raw = window.localStorage.getItem(storageKey);
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return fallback;
+    const filtered = parsed.filter(
+      (value): value is string => typeof value === "string" && allowed.includes(value),
+    );
+    return filtered.length ? Array.from(new Set(filtered)) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function ProxyPoolPage({
   settingsDraft,
@@ -26,10 +96,32 @@ export function ProxyPoolPage({
   const [testing, setTesting] = useState<string[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [addText, setAddText] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [selectedCountries, setSelectedCountries] = useState(() =>
+    readStoredSelection(proxyImportCountriesKey, countryOptions, defaultCountries),
+  );
+  const [selectedProtocols, setSelectedProtocols] = useState(() =>
+    readStoredSelection(proxyImportProtocolsKey, protocolOptions, defaultProtocols),
+  );
+  const [importingURL, setImportingURL] = useState(false);
 
   useEffect(() => {
     setResults(settingsDraft.proxy_test_results || {});
   }, [settingsDraft.proxy_test_results]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      proxyImportCountriesKey,
+      JSON.stringify(selectedCountries),
+    );
+  }, [selectedCountries]);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      proxyImportProtocolsKey,
+      JSON.stringify(selectedProtocols),
+    );
+  }, [selectedProtocols]);
 
   const persist = (proxies: string[]) => {
     const allowed = new Set(proxies);
@@ -83,6 +175,57 @@ export function ProxyPoolPage({
     );
     setAddText("");
     setAddOpen(false);
+  }
+  function toggleSelection(values: string[], value: string) {
+    return values.includes(value)
+      ? values.filter((item) => item !== value)
+      : [...values, value];
+  }
+  async function importFromURL(url: string) {
+    if (!url.trim()) {
+      showToast("Import URL is required", "error");
+      return;
+    }
+    setImportingURL(true);
+    try {
+      const data = await api<{ items: string[]; total: number }>(
+        "/api/proxy/import-url",
+        {
+          method: "POST",
+          body: JSON.stringify({ url: url.trim() }),
+        },
+      );
+      const { merged, addedCount, skippedCount } = mergeUniqueProxiesByHost(
+        settingsDraft.proxies,
+        data.items,
+      );
+      const next = { ...settingsDraft, proxies: merged };
+      setSettingsDraft(next);
+      await saveSettings(next);
+      setImportOpen(false);
+      showToast(
+        `Imported ${addedCount} proxies from URL${skippedCount ? `, skipped ${skippedCount} duplicate IPs` : ""}`,
+        "success",
+      );
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "Import failed", "error");
+    } finally {
+      setImportingURL(false);
+    }
+  }
+  async function importPreset() {
+    await importFromURL(buildProxyImportURL(defaultCountries, defaultProtocols));
+  }
+  async function importSelectedFilters() {
+    if (!selectedCountries.length) {
+      showToast("Select at least one country", "error");
+      return;
+    }
+    if (!selectedProtocols.length) {
+      showToast("Select at least one protocol", "error");
+      return;
+    }
+    await importFromURL(buildProxyImportURL(selectedCountries, selectedProtocols));
   }
   async function testMany(proxies: string[]) {
     const ps = proxies.filter(Boolean);
@@ -148,6 +291,19 @@ export function ProxyPoolPage({
         icon={<PlugZap size={18} />}
         actions={
           <div className="flex gap-2">
+            <button
+              onClick={importPreset}
+              disabled={importingURL}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {importingURL ? "Importing..." : "Import JP/US/TH"}
+            </button>
+            <button
+              onClick={() => setImportOpen(true)}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"
+            >
+              Import Filtered
+            </button>
             <button
               onClick={() => setAddOpen(true)}
               className="rounded-xl border bg-white px-3 py-2 text-sm font-bold"
@@ -268,6 +424,135 @@ export function ProxyPoolPage({
             >
               Add Proxies
             </button>
+          </div>
+        </Modal>
+      )}
+      {importOpen && (
+        <Modal
+          title="Import Filtered Proxies"
+          subtitle="Pick countries and protocols. The app builds a ProxyScrape URL and imports proxies[].proxy into your current pool."
+          onClose={() => !importingURL && setImportOpen(false)}
+        >
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-slate-700">Countries</div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCountries(countryOptions)}
+                    className="rounded-lg border bg-white px-2 py-1 text-xs font-bold text-slate-600"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCountries([])}
+                    className="rounded-lg border bg-white px-2 py-1 text-xs font-bold text-slate-600"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {countryOptions.map((country) => {
+                  const selected = selectedCountries.includes(country);
+                  return (
+                    <button
+                      key={country}
+                      type="button"
+                      onClick={() =>
+                        setSelectedCountries((prev) => toggleSelection(prev, country))
+                      }
+                      className={`rounded-xl border px-3 py-2 text-sm font-bold ${
+                        selected
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "bg-white text-slate-700"
+                      }`}
+                    >
+                      {country}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="text-sm font-bold text-slate-700">Protocols</div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProtocols(protocolOptions)}
+                    className="rounded-lg border bg-white px-2 py-1 text-xs font-bold text-slate-600"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProtocols([])}
+                    className="rounded-lg border bg-white px-2 py-1 text-xs font-bold text-slate-600"
+                  >
+                    Clear All
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {protocolOptions.map((protocol) => {
+                  const selected = selectedProtocols.includes(protocol);
+                  return (
+                    <button
+                      key={protocol}
+                      type="button"
+                      onClick={() =>
+                        setSelectedProtocols((prev) => toggleSelection(prev, protocol))
+                      }
+                      className={`rounded-xl border px-3 py-2 text-sm font-bold ${
+                        selected
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : "bg-white text-slate-700"
+                      }`}
+                    >
+                      {protocol}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-bold text-slate-700">Generated URL</div>
+              <div className="rounded-xl border bg-slate-50 p-3 font-mono text-xs text-slate-600 break-all">
+                {buildProxyImportURL(selectedCountries, selectedProtocols)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCountries(defaultCountries);
+                setSelectedProtocols(defaultProtocols);
+              }}
+              disabled={importingURL}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              Reset to Default
+            </button>
+            <div className="flex gap-2">
+            <button
+              onClick={() => setImportOpen(false)}
+              disabled={importingURL}
+              className="rounded-xl border bg-white px-3 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={importSelectedFilters}
+              disabled={importingURL}
+              className="rounded-xl bg-slate-950 px-3 py-2 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {importingURL ? "Importing..." : "Import Proxies"}
+            </button>
+            </div>
           </div>
         </Modal>
       )}

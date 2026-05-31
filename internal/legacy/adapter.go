@@ -30,9 +30,14 @@ func MailboxFromDomain(item domain.Mailbox) Mailbox {
 	}
 }
 
-func SettingsFromDomain(settings domain.Settings, proxy string) Settings {
+func MailboxCanFetchEmailOTP(item domain.Mailbox, settings domain.Settings) bool {
+	return MailboxFromDomain(item).CanFetchEmailOTP(SettingsFromDomain(settings, "", nil))
+}
+
+func SettingsFromDomain(settings domain.Settings, proxy string, controller ProxyController) Settings {
 	return Settings{
 		Proxy:                  proxy,
+		ProxyController:        controller,
 		PasswordMode:           settings.PasswordMode,
 		FixedPassword:          settings.FixedPassword,
 		RegisterConcurrency:    settings.RegisterConcurrency,
@@ -47,6 +52,6 @@ func SettingsFromDomain(settings domain.Settings, proxy string) Settings {
 
 func TestMailboxIMAP(ctx context.Context, mailbox domain.Mailbox, settings domain.Settings, proxy string) error {
 	legacyMailbox := MailboxFromDomain(mailbox)
-	legacySettings := SettingsFromDomain(settings, proxy)
+	legacySettings := SettingsFromDomain(settings, proxy, nil)
 	return testMailboxIMAP(ctx, legacyMailbox, legacySettings)
 }

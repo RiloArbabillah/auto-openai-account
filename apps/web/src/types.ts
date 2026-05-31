@@ -68,12 +68,45 @@ export type RuntimeLog = {
 };
 
 export type SMSConfig = {
+  id: string;
   name: string;
+  type: "provider" | "pool";
   platform: string;
-  api_key: string;
-  service_id: string;
-  country_id: number;
-  max_price: number;
+  platform_label?: string;
+  api_key?: string;
+  service_id?: string;
+  country_id?: number;
+  max_price?: number;
+  max_usage_per_phone?: number;
+  disable_on_error?: "permanent_only" | "any_failure";
+  pool_summary?: SMSPoolSummary;
+};
+
+export type SMSPoolSummary = {
+  total_count: number;
+  ready_count: number;
+  reserved_count: number;
+  used_up_count: number;
+  disabled_count: number;
+  error_count: number;
+  remaining_uses: number;
+};
+
+export type PhonePoolItem = {
+  id: number;
+  sms_config_id: string;
+  phone_number: string;
+  code_fetch_url: string;
+  status: string;
+  use_count: number;
+  max_use_count: number;
+  last_error?: string;
+  last_job_id?: number;
+  last_mailbox_id?: number;
+  reserved_at?: string;
+  last_used_at?: string;
+  created_at: string;
+  updated_at: string;
 };
 
 export type SMSCatalogService = {
@@ -95,9 +128,15 @@ export type SMSCatalog = {
   countries: SMSCatalogCountry[];
 };
 
-export type SettingsPayload = {
-  proxy_mode: string;
+export type ProxyGroup = {
+  id: string;
+  name: string;
+  mode: string;
   proxies: string[];
+};
+
+export type SettingsPayload = {
+  proxy_groups: ProxyGroup[];
   proxy_test_results: Record<string, ProxyTestResult>;
   register_concurrency: number;
   password_mode: string;
@@ -109,6 +148,10 @@ export type SettingsPayload = {
   otp_poll_interval_seconds: number;
   listen: string;
   sms_configs: SMSConfig[];
+};
+
+export type SaveSettingsOptions = {
+  syncPoolMaxUseCount?: boolean;
 };
 
 export type ProxyTestResult = {

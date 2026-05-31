@@ -15,7 +15,7 @@ import { Overview } from "./pages/Overview/Overview";
 import { PluginsPage } from "./pages/PluginsPage/PluginsPage";
 import { ProxyPoolPage } from "./pages/ProxyPoolPage/ProxyPoolPage";
 import { SmsSettingsPage } from "./pages/SmsSettingsPage/SmsSettingsPage";
-import type { Job, JobTokenExportItem, Mailbox, MailboxUpdate, RuntimeLog, SettingsPayload, Stats, ToastState, TokenExportConfirm } from "./types";
+import type { Job, JobTokenExportItem, Mailbox, MailboxUpdate, RuntimeLog, SaveSettingsOptions, SettingsPayload, Stats, ToastState, TokenExportConfirm } from "./types";
 import "./styles.css";
 import styles from "./App.module.css";
 
@@ -63,10 +63,12 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
   const [taskOpen, setTaskOpen] = useState(false);
+  const [credentialsOpen, setCredentialsOpen] = useState(false);
   const [mailboxDetail, setMailboxDetail] = useState<Mailbox | null>(null);
   const [mailboxDetailDraft, setMailboxDetailDraft] =
     useState<MailboxUpdate | null>(null);
-  const [credentialsOpen, setCredentialsOpen] = useState(false);
+  const [mailboxCodexTarget, setMailboxCodexTarget] = useState<number[] | null>(null);
+  const [mailboxLoginTarget, setMailboxLoginTarget] = useState<number[] | null>(null);
   const [tokenExportConfirm, setTokenExportConfirm] =
     useState<TokenExportConfirm>(null);
   const [themePreference, setThemePreference] =
@@ -213,8 +215,9 @@ function App() {
     return () => source.close();
   }, [latestJob?.id, latestJob?.status, activeJob?.id]);
 
-  async function saveSettings(next: SettingsPayload) {
-    const saved = await api<{ settings: SettingsPayload }>("/api/settings", {
+  async function saveSettings(next: SettingsPayload, options?: SaveSettingsOptions) {
+    const query = options?.syncPoolMaxUseCount ? "?sync_pool_max_use_count=1" : "";
+    const saved = await api<{ settings: SettingsPayload }>(`/api/settings${query}`, {
       method: "PUT",
       body: JSON.stringify(normalizeSettingsPayload(next)),
     });
@@ -251,14 +254,24 @@ function App() {
     config: SettingsPayload,
     count: number,
     flow = "register_login",
-    smsConfigName = "",
+    smsConfigID = "",
+    proxyGroupID = "",
   ) {
     setBusy(true);
     try {
       await saveSettings(config);
       const job = await api<Job>("/api/register-jobs", {
         method: "POST",
-        body: JSON.stringify({ count, flow, sms_config_name: smsConfigName }),
+        body: JSON.stringify({
+          count,
+          flow,
+          sms_config_id: smsConfigID,
+          sms_config_name:
+            config.sms_configs.find((item) => item.id === smsConfigID)?.name || "",
+          proxy_group_id: proxyGroupID,
+          proxy_group_name:
+            config.proxy_groups.find((item) => item.id === proxyGroupID)?.name || "",
+        }),
       });
       setActiveJob(job);
       setTaskOpen(false);
@@ -278,7 +291,8 @@ function App() {
     config: SettingsPayload,
     ids: number[],
     flow = "login",
-    smsConfigName = "",
+    smsConfigID = "",
+    proxyGroupID = "",
   ) {
     if (ids.length === 0) return;
     setBusy(true);
@@ -286,10 +300,22 @@ function App() {
       await saveSettings(config);
       const job = await api<Job>("/api/login-jobs", {
         method: "POST",
-        body: JSON.stringify({ mailbox_ids: ids, flow, sms_config_name: smsConfigName }),
+        body: JSON.stringify({
+          mailbox_ids: ids,
+          flow,
+          sms_config_id: smsConfigID,
+          sms_config_name:
+            config.sms_configs.find((item) => item.id === smsConfigID)?.name || "",
+          proxy_group_id: proxyGroupID,
+          proxy_group_name:
+            config.proxy_groups.find((item) => item.id === proxyGroupID)?.name || "",
+        }),
       });
       setActiveJob(job);
       setTaskOpen(false);
+      showToast(`Login job #${job.id} started`, "success");
+      setMailboxCodexTarget(null);
+      setMailboxLoginTarget(null);
       showToast(`Login job #${job.id} started`, "success");
       await refresh(job.id);
     } catch (error) {
@@ -300,6 +326,20 @@ function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function openCodexLoginTask(ids: number[]) {
+    if (!settingsDraft || ids.length === 0) return;
+    setMailboxLoginTarget(null);
+    setMailboxCodexTarget(ids);
+    setTaskOpen(true);
+  }
+
+  function openLoginTask(ids: number[]) {
+    if (!settingsDraft || ids.length === 0) return;
+    setMailboxCodexTarget(null);
+    setMailboxLoginTarget(ids);
+    setTaskOpen(true);
   }
 
   async function deleteMailboxes(ids: number[]) {
@@ -576,6 +616,12 @@ function App() {
   const newCount = stats.mailboxes.new || 0;
   const runningCount = stats.mailboxes.registering || 0;
   const loginingCount = stats.mailboxes.logining || 0;
+  const proxyGroupCount = settings?.proxy_groups?.length || 0;
+  const proxyTotalCount = settings?.proxy_groups?.reduce(
+    (sum, group) => sum + (group.proxies?.length || 0),
+    0,
+  ) || 0;
+  const proxyCountLabel = `${proxyGroupCount} groups / ${proxyTotalCount} proxies`;
 
   return (
     <div className="theme-shell min-h-screen text-slate-950">
@@ -618,7 +664,13 @@ function App() {
             settings={settingsDraft}
             mailboxes={mailboxes}
             busy={busy}
-            onClose={() => setTaskOpen(false)}
+            codexLoginTargetIds={mailboxCodexTarget || undefined}
+            loginTargetIds={mailboxLoginTarget || undefined}
+            onClose={() => {
+              setTaskOpen(false);
+              setMailboxCodexTarget(null);
+              setMailboxLoginTarget(null);
+            }}
             onCreateRegister={createRegisterTask}
             onCreateLogin={createLoginTask}
           />
@@ -656,7 +708,7 @@ function App() {
                   loginingCount,
                   registered,
                   abnormal,
-                  proxyCount: settings?.proxies?.length || 0,
+                  proxyCountLabel,
                 }}
                 mailboxes={mailboxes}
                 logs={latestLogs}
@@ -679,10 +731,9 @@ function App() {
                 openMailboxDetail={openMailboxDetail}
                 deleteMailboxes={deleteMailboxes}
                 resetMailboxes={resetMailboxes}
-                startLoginJob={(ids) =>
-                  settingsDraft && createLoginTask(settingsDraft, ids)
-                }
                 testMailboxConnection={testMailboxConnectionByID}
+                startLoginJob={openLoginTask}
+                startCodexLoginJob={openCodexLoginTask}
                 busy={busy}
               />
             }

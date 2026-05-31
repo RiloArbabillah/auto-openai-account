@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -43,6 +44,9 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/proxy/import-url", s.handleProxyImportURL)
 	mux.HandleFunc("/api/proxy/test", s.handleProxyTest)
 	mux.HandleFunc("/api/sms/catalog", s.handleSMSCatalog)
+	mux.HandleFunc("/api/sms-configs/", s.handleSMSConfigByID)
+	mux.HandleFunc("/api/phone-pool-items/", s.handlePhonePoolItemByID)
+	mux.HandleFunc("/api/phone-pool-preview/", s.handlePhonePoolPreviewByID)
 	mux.HandleFunc("/api/stats", s.handleStats)
 	mux.Handle("/", webui.Handler())
 	return mux
@@ -288,22 +292,198 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			writeError(w, 500, err)
 			return
 		}
-		writeJSON(w, 200, settings)
+		payload, err := s.publicSettings(settings)
+		if err != nil {
+			writeError(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, payload)
 	case http.MethodPut, http.MethodPost:
 		var settings domain.Settings
 		if err := json.NewDecoder(r.Body).Decode(&settings); err != nil {
 			writeError(w, 400, fmt.Errorf("invalid json body"))
 			return
 		}
+		syncPoolMaxUseCount := strings.TrimSpace(r.URL.Query().Get("sync_pool_max_use_count")) == "1"
 		if err := s.store.SaveSettings(settings); err != nil {
 			writeError(w, 500, err)
 			return
 		}
+		if syncPoolMaxUseCount {
+			settings = domain.NormalizeSettings(settings)
+			for _, config := range settings.SMSConfigs {
+				if config.Type != domain.SMSConfigTypePool {
+					continue
+				}
+				if err := s.store.SyncPhonePoolMaxUseCount(config.ID, config.MaxUsagePerPhone); err != nil {
+					writeError(w, 500, err)
+					return
+				}
+			}
+		}
 		settings, _ = s.store.LoadSettings()
-		writeJSON(w, 200, map[string]any{"ok": true, "settings": settings})
+		payload, err := s.publicSettings(settings)
+		if err != nil {
+			writeError(w, 500, err)
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true, "settings": payload})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
+}
+
+func (s *Server) publicSettings(settings domain.Settings) (map[string]any, error) {
+	settings = domain.NormalizeSettings(settings)
+	configIDs := make([]string, 0, len(settings.SMSConfigs))
+	for _, config := range settings.SMSConfigs {
+		if config.Type == domain.SMSConfigTypePool {
+			configIDs = append(configIDs, config.ID)
+		}
+	}
+	if len(configIDs) > 0 {
+		summaries, err := s.store.ListSMSPoolSummaries(configIDs)
+		if err != nil {
+			return nil, err
+		}
+		for i := range settings.SMSConfigs {
+			if settings.SMSConfigs[i].Type != domain.SMSConfigTypePool {
+				continue
+			}
+			summary := summaries[settings.SMSConfigs[i].ID]
+			settings.SMSConfigs[i].PoolSummary = &summary
+		}
+	}
+	return map[string]any{
+		"proxy_groups":              settings.ProxyGroups,
+		"proxy_test_results":        settings.ProxyTestResults,
+		"password_mode":             settings.PasswordMode,
+		"fixed_password":            settings.FixedPassword,
+		"register_concurrency":      settings.RegisterConcurrency,
+		"otp_timeout_seconds":       settings.OTPTimeoutSeconds,
+		"otp_poll_interval_seconds": settings.OTPPollIntervalSeconds,
+		"imap_host":                 settings.IMAPHost,
+		"imap_port":                 settings.IMAPPort,
+		"imap_auth_mode":            settings.IMAPAuthMode,
+		"listen":                    settings.Listen,
+		"sms_configs":               settings.SMSConfigs,
+	}, nil
+}
+
+func (s *Server) handleSMSConfigByID(w http.ResponseWriter, r *http.Request) {
+	id, suffix, ok := parseStringIDPath(r.URL.Path, "/api/sms-configs/")
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	if suffix == "phone-pool" {
+		s.handleSMSConfigPhonePool(w, r, id)
+		return
+	}
+	if suffix == "phone-pool/import" {
+		s.handleSMSConfigPhonePoolImport(w, r, id)
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func (s *Server) handleSMSConfigPhonePool(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	q := r.URL.Query()
+	page, _ := strconv.Atoi(q.Get("page"))
+	pageSize, _ := strconv.Atoi(q.Get("page_size"))
+	result, err := s.store.ListPhonePoolItems(id, q.Get("status"), page, pageSize)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (s *Server) handleSMSConfigPhonePoolImport(w http.ResponseWriter, r *http.Request, id string) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	settings, err := s.store.LoadSettings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	config, ok := domain.FindSMSConfigByID(settings.SMSConfigs, id)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Errorf("sms config not found"))
+		return
+	}
+	if config.Type != domain.SMSConfigTypePool {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("only pool sms configs support phone import"))
+		return
+	}
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid json body"))
+		return
+	}
+	imported, skipped, errs, err := s.store.ImportPhonePoolItems(id, config.MaxUsagePerPhone, body.Text)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"imported": imported, "skipped": skipped, "failed": len(errs), "errors": errs})
+}
+
+func (s *Server) handlePhonePoolItemByID(w http.ResponseWriter, r *http.Request) {
+	id, suffix, ok := parseIDPath(r.URL.Path, "/api/phone-pool-items/")
+	if !ok || suffix != "" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	deleted, err := s.store.DeletePhonePoolItem(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	if !deleted {
+		writeError(w, http.StatusNotFound, fmt.Errorf("phone pool item not found"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (s *Server) handlePhonePoolPreviewByID(w http.ResponseWriter, r *http.Request) {
+	id, suffix, ok := parseIDPath(r.URL.Path, "/api/phone-pool-preview/")
+	if !ok || suffix != "" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	item, err := s.store.GetPhonePoolItem(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Errorf("phone pool item not found"))
+		return
+	}
+	previewText, code, err := fetchPhonePoolPreview(r.Context(), item.CodeFetchURL)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"found":        strings.TrimSpace(code) != "",
+		"code":         code,
+		"preview_text": previewText,
+	})
 }
 
 func (s *Server) handleMailboxImport(w http.ResponseWriter, r *http.Request) {
@@ -444,7 +624,7 @@ func (s *Server) handleMailboxLogin(w http.ResponseWriter, r *http.Request, id i
 		writeError(w, http.StatusNotFound, fmt.Errorf("mailbox not found"))
 		return
 	}
-	job, err := s.runner.StartLogin([]int64{mailbox.ID}, "", "")
+	job, err := s.runner.StartLogin([]int64{mailbox.ID}, "", "", "", "", "")
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -510,15 +690,18 @@ func (s *Server) handleLoginJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		MailboxIDs    []int64 `json:"mailbox_ids"`
-		Flow          string  `json:"flow"`
-		SMSConfigName string  `json:"sms_config_name"`
+		MailboxIDs     []int64 `json:"mailbox_ids"`
+		Flow           string  `json:"flow"`
+		SMSConfigID    string  `json:"sms_config_id"`
+		SMSConfigName  string  `json:"sms_config_name"`
+		ProxyGroupID   string  `json:"proxy_group_id"`
+		ProxyGroupName string  `json:"proxy_group_name"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid json body"))
 		return
 	}
-	job, err := s.runner.StartLogin(body.MailboxIDs, body.Flow, body.SMSConfigName)
+	job, err := s.runner.StartLogin(body.MailboxIDs, body.Flow, body.SMSConfigID, body.SMSConfigName, body.ProxyGroupID, body.ProxyGroupName)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return
@@ -540,15 +723,18 @@ func (s *Server) handleRegisterJobs(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, result)
 	case http.MethodPost:
 		var body struct {
-			Count         int    `json:"count"`
-			Flow          string `json:"flow"`
-			SMSConfigName string `json:"sms_config_name"`
+			Count          int    `json:"count"`
+			Flow           string `json:"flow"`
+			SMSConfigID    string `json:"sms_config_id"`
+			SMSConfigName  string `json:"sms_config_name"`
+			ProxyGroupID   string `json:"proxy_group_id"`
+			ProxyGroupName string `json:"proxy_group_name"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			writeError(w, 400, fmt.Errorf("invalid json body"))
 			return
 		}
-		job, err := s.runner.Start(body.Count, body.Flow, body.SMSConfigName)
+		job, err := s.runner.Start(body.Count, body.Flow, body.SMSConfigID, body.SMSConfigName, body.ProxyGroupID, body.ProxyGroupName)
 		if err != nil {
 			writeError(w, 400, err)
 			return
@@ -749,6 +935,23 @@ func parseIDPath(path, prefix string) (int64, string, bool) {
 	}
 	return id, suffix, true
 }
+
+func parseStringIDPath(path, prefix string) (string, string, bool) {
+	if !strings.HasPrefix(path, prefix) {
+		return "", "", false
+	}
+	rest := strings.Trim(strings.TrimPrefix(path, prefix), "/")
+	parts := strings.Split(rest, "/")
+	if len(parts) == 0 || strings.TrimSpace(parts[0]) == "" {
+		return "", "", false
+	}
+	id := strings.TrimSpace(parts[0])
+	suffix := ""
+	if len(parts) > 1 {
+		suffix = strings.Join(parts[1:], "/")
+	}
+	return id, suffix, true
+}
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
@@ -758,4 +961,37 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 }
 func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]any{"error": err.Error()})
+}
+
+func fetchPhonePoolPreview(ctx context.Context, targetURL string) (string, string, error) {
+	targetURL = strings.TrimSpace(targetURL)
+	if targetURL == "" {
+		return "", "", fmt.Errorf("code fetch url is required")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	if err != nil {
+		return "", "", fmt.Errorf("invalid code fetch url")
+	}
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", err
+	}
+	text := strings.TrimSpace(string(body))
+	code := smsbiz.ExtractCodeFromText(text)
+	return truncatePreviewText(text), code, nil
+}
+
+func truncatePreviewText(text string) string {
+	const maxLen = 500
+	text = strings.TrimSpace(text)
+	if len(text) <= maxLen {
+		return text
+	}
+	return text[:maxLen] + "..."
 }

@@ -37,6 +37,33 @@ export function MailboxDetailModal({
       title="Mailbox Details"
       subtitle={detailDraft.email || detail.email}
       onClose={onClose}
+      footer={
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onTestConnection}
+            disabled={busy || !detailDraft.email.trim()}
+            className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
+          >
+            Test Email
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl border bg-white px-3 py-2 font-bold"
+          >
+	          Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={busy || !detailDraft.email.trim()}
+            className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
+          >
+	          Save
+          </button>
+        </div>
+      }
     >
       <div className="space-y-3 text-sm">
         <Field label="OpenAI Password">
@@ -45,7 +72,7 @@ export function MailboxDetailModal({
             onChange={(event) =>
               onUpdateDraft("register_password", event.target.value)
             }
-            className="w-full rounded-xl border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm outline-none transition focus:border-blue-500"
             placeholder="OpenAI login password"
           />
         </Field>
@@ -88,7 +115,7 @@ export function MailboxDetailModal({
                 detailDraft.access_token || "",
               ].join("----")}
               onChange={(event) => onUpdateCredentialLine(event.target.value)}
-              className="mt-2 h-24 w-full rounded-xl border bg-white p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              className="mt-2 h-24 w-full rounded-xl border border-slate-200 bg-white p-3 font-mono text-xs outline-none transition focus:border-blue-500"
               placeholder="email@example.com----password----client_id----refresh_token"
             />
           )}
@@ -98,7 +125,7 @@ export function MailboxDetailModal({
             <input
               value={manualOTP}
               onChange={(event) => setManualOTP(event.target.value)}
-              className="w-full rounded-xl border bg-white px-3 py-2 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 font-mono text-sm outline-none transition focus:border-blue-500"
               placeholder="Enter the 6-digit verification code"
             />
             <button
@@ -114,31 +141,6 @@ export function MailboxDetailModal({
             </button>
           </div>
         </Field>
-        <div className="flex justify-end gap-2 pt-2">
-          <button
-            type="button"
-            onClick={onTestConnection}
-            disabled={busy || !detailDraft.email.trim()}
-            className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
-          >
-            Test Email
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-xl border bg-white px-3 py-2 font-bold"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={busy || !detailDraft.email.trim()}
-            className="rounded-xl bg-slate-950 px-3 py-2 font-bold text-white disabled:opacity-50"
-          >
-            Save
-          </button>
-        </div>
       </div>
     </Modal>
   );

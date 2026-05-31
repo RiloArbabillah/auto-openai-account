@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"time"
 
@@ -59,6 +60,12 @@ func (s *Store) init() error {
 		`CREATE INDEX IF NOT EXISTS idx_register_job_items_job_id ON register_job_items (job_id, id)`,
 		`CREATE TABLE IF NOT EXISTS runtime_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, job_id INTEGER NOT NULL DEFAULT 0, mailbox_id INTEGER NOT NULL DEFAULT 0, email TEXT, level TEXT NOT NULL, step TEXT, step_index INTEGER NOT NULL DEFAULT 0, step_total INTEGER NOT NULL DEFAULT 0, message TEXT NOT NULL, created_at TEXT NOT NULL)`,
 		`CREATE INDEX IF NOT EXISTS idx_runtime_logs_job_id_id ON runtime_logs (job_id, id)`,
+		`CREATE TABLE IF NOT EXISTS phone_pool_items (id INTEGER PRIMARY KEY AUTOINCREMENT, sms_config_id TEXT NOT NULL, phone_number TEXT NOT NULL, code_fetch_url TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'ready', use_count INTEGER NOT NULL DEFAULT 0, max_use_count INTEGER NOT NULL DEFAULT 1, last_error TEXT, last_job_id INTEGER NOT NULL DEFAULT 0, last_mailbox_id INTEGER NOT NULL DEFAULT 0, reserved_at TEXT, last_used_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(sms_config_id, phone_number))`,
+		`CREATE INDEX IF NOT EXISTS idx_phone_pool_items_config_status_id ON phone_pool_items (sms_config_id, status, id)`,
+		`CREATE INDEX IF NOT EXISTS idx_phone_pool_items_config_usecount_id ON phone_pool_items (sms_config_id, use_count, id)`,
+		`CREATE TABLE IF NOT EXISTS phone_pool_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, phone_pool_item_id INTEGER NOT NULL, sms_config_id TEXT NOT NULL, job_id INTEGER NOT NULL DEFAULT 0, mailbox_id INTEGER NOT NULL DEFAULT 0, phone_number TEXT NOT NULL, result TEXT NOT NULL, error_code TEXT, error_message TEXT, verification_code TEXT, created_at TEXT NOT NULL, finished_at TEXT)`,
+		`CREATE INDEX IF NOT EXISTS idx_phone_pool_attempts_item_id ON phone_pool_attempts (phone_pool_item_id, id)`,
+		`CREATE INDEX IF NOT EXISTS idx_phone_pool_attempts_config_id ON phone_pool_attempts (sms_config_id, id)`,
 	}
 	for _, stmt := range stmts {
 		if _, err := s.db.Exec(stmt); err != nil && !strings.Contains(err.Error(), "duplicate column") {
@@ -97,11 +104,20 @@ func (s *Store) LoadSettings() (domain.Settings, error) {
 	}
 	data, _ := json.Marshal(values)
 	_ = json.Unmarshal(data, &settings)
-	return domain.NormalizeSettings(settings), rows.Err()
+	normalized := domain.NormalizeSettings(settings)
+	if values["proxy_mode"] != nil || values["proxies"] != nil || !reflect.DeepEqual(settings, normalized) {
+		if err := s.SaveSettings(normalized); err != nil {
+			return normalized, err
+		}
+	}
+	return normalized, rows.Err()
 }
 
 func (s *Store) SaveSettings(settings domain.Settings) error {
 	settings = domain.NormalizeSettings(settings)
+	if err := domain.ValidateSettings(settings); err != nil {
+		return err
+	}
 	data, err := json.Marshal(settings)
 	if err != nil {
 		return err
@@ -110,12 +126,17 @@ func (s *Store) SaveSettings(settings domain.Settings) error {
 	if err := json.Unmarshal(data, &values); err != nil {
 		return err
 	}
+	delete(values, "proxy_mode")
+	delete(values, "proxies")
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 	ts := now()
+	if _, err := tx.Exec(`DELETE FROM settings WHERE key IN ('proxy_mode', 'proxies')`); err != nil {
+		return err
+	}
 	for k, v := range values {
 		enc, _ := json.Marshal(v)
 		if _, err := tx.Exec(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`, k, string(enc), ts); err != nil {

@@ -31,6 +31,7 @@ type SMSActivation = legacy.CodexSMSActivation
 
 type SMSProvider interface {
 	GetNumber(context.Context) (*SMSActivation, error)
+	MarkSubmitted(context.Context, string) error
 	PollCode(context.Context, string) (string, error)
 	Complete(context.Context, string) error
 	Cancel(context.Context, string) error
@@ -40,7 +41,9 @@ type LoginOptions struct {
 	Email                    string
 	Password                 string
 	Proxy                    string
+	ProxyController          legacy.ProxyController
 	SMSProvider              SMSProvider
+	OTPFetcher               func(context.Context) (string, error)
 	ProgressChan             chan<- LoginProgress
 	MaxPhoneAttempts         int
 	PasswordVerifyRetries    int
@@ -58,7 +61,9 @@ func LoginWithCodex(ctx context.Context, opts LoginOptions) (*LoginResult, error
 		Email:                    opts.Email,
 		Password:                 opts.Password,
 		Proxy:                    opts.Proxy,
+		ProxyController:          opts.ProxyController,
 		SMSProvider:              opts.SMSProvider,
+		OTPFetcher:               opts.OTPFetcher,
 		MaxPhoneAttempts:         opts.MaxPhoneAttempts,
 		PasswordVerifyRetries:    opts.PasswordVerifyRetries,
 		PasswordVerifyRetryDelay: opts.PasswordVerifyRetryDelay,

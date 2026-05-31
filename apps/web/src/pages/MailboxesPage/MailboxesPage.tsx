@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Database, UploadCloud } from "lucide-react";
+import { Database, KeyRound, ShieldCheck, UploadCloud } from "lucide-react";
 import { jobTypeText, resultText } from "../../lib/format";
 import type { Mailbox, MailboxView } from "../../types";
 import { Badge } from "../../components/Badge/Badge";
@@ -20,6 +20,7 @@ export function MailboxesPage({
   resetMailboxes,
   startLoginJob,
   testMailboxConnection,
+  startCodexLoginJob,
   busy,
 }: {
   mailboxes: Mailbox[];
@@ -31,6 +32,7 @@ export function MailboxesPage({
   resetMailboxes: (ids: number[]) => void;
   startLoginJob: (ids: number[]) => void;
   testMailboxConnection: (id: number) => void;
+  startCodexLoginJob: (ids: number[]) => void;
   busy: boolean;
 }) {
   const [selected, setSelected] = useState<number[]>([]);
@@ -118,11 +120,27 @@ export function MailboxesPage({
               Bulk Import
             </button>
             <button
-              onClick={() => startLoginJob(selected)}
+              onClick={() => {
+                if (selected.length === 0) return;
+                startLoginJob(selected);
+              }}
               disabled={busy || selected.length === 0}
               className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
             >
-              Bulk Login
+              <span className="inline-flex items-center gap-2">
+                <KeyRound size={16} />
+                Bulk Login
+              </span>
+            </button>
+            <button
+              onClick={() => startCodexLoginJob(selected)}
+              disabled={busy || selected.length === 0}
+              className="rounded-xl border bg-white px-3 py-2 font-bold disabled:opacity-50"
+            >
+              <span className="inline-flex items-center gap-2">
+                <ShieldCheck size={16} />
+                Bulk Codex Login
+              </span>
             </button>
             <button
               onClick={confirmReset}
@@ -220,6 +238,12 @@ export function MailboxesPage({
                   >
                     Test Email
                   </button>
+                   <button
+                     onClick={() => startCodexLoginJob([m.id])}
+                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
+                   >
+                     Codex Login
+                   </button>
                   <button
                     onClick={() => resetMailboxes([m.id])}
                     className="rounded-xl border bg-white px-3 py-2 text-xs font-bold"
@@ -300,7 +324,7 @@ export function MailboxesPage({
             value={importText}
             onChange={(e) => setImportText(e.target.value)}
             placeholder="email@example.com----password----client_id----refresh_token"
-            className="h-60 w-full rounded-xl border bg-white p-3 font-mono text-sm outline-none focus:ring-2 focus:ring-blue-500"
+            className="h-60 w-full rounded-xl border border-slate-200 bg-white p-3 font-mono text-sm outline-none transition focus:border-blue-500"
           />
           <div className="mt-4 flex justify-end gap-2">
             <button
